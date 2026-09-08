@@ -266,12 +266,9 @@ function createDebris(): THREE.Group {
   return group;
 }
 
-// ====== KOMET - dengan ekor partikel ======
-function createComet(): THREE.Group {
-  const group = new THREE.Group();
-  
-  // Inti komet
-  const coreSize = 0.4 + Math.random() * 0.4;
+// ====== KOMET - tanpa ekor ======
+function createComet(): THREE.Mesh {
+  const coreSize = 0.5 + Math.random() * 0.5;
   const coreGeo = new THREE.SphereGeometry(coreSize, 16, 16);
   const coreMat = new THREE.MeshStandardMaterial({
     color: 0xccddee,
@@ -281,48 +278,265 @@ function createComet(): THREE.Group {
     transparent: true,
     opacity: 0,
   });
-  const core = new THREE.Mesh(coreGeo, coreMat);
-  group.add(core);
+  return new THREE.Mesh(coreGeo, coreMat);
+}
+
+// ====== SATELIT ======
+function createSatellite(): THREE.Group {
+  const group = new THREE.Group();
   
-  // Ekor partikel
-  const tailCount = 150;
-  const positions = new Float32Array(tailCount * 3);
-  const colors = new Float32Array(tailCount * 3);
-  const sizes = new Float32Array(tailCount);
-  
-  for (let i = 0; i < tailCount; i++) {
-    const t = i / tailCount;
-    const spread = 1 + t * 4;
-    
-    positions[i * 3] = (Math.random() - 0.5) * spread;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * spread * 0.5;
-    positions[i * 3 + 2] = t * 12 + Math.random() * 2;
-    
-    const brightness = 1 - t * 0.8;
-    colors[i * 3] = 0.6 * brightness;
-    colors[i * 3 + 1] = 0.8 * brightness;
-    colors[i * 3 + 2] = 1.0 * brightness;
-    
-    sizes[i] = (1 - t) * 0.8 + 0.2;
-  }
-  
-  const tailGeo = new THREE.BufferGeometry();
-  tailGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  tailGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  tailGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-  
-  const tailMat = new THREE.PointsMaterial({
-    size: 0.6,
-    vertexColors: true,
+  // Badan utama
+  const bodyGeo = new THREE.BoxGeometry(0.8, 0.8, 1.2);
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0x888899,
+    roughness: 0.3,
+    metalness: 0.9,
     transparent: true,
     opacity: 0,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    sizeAttenuation: true,
   });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  group.add(body);
   
-  const tail = new THREE.Points(tailGeo, tailMat);
-  group.add(tail);
+  // Panel surya (2 sisi)
+  for (let side = -1; side <= 1; side += 2) {
+    const panelGeo = new THREE.BoxGeometry(2.5, 0.05, 1);
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0x223366,
+      roughness: 0.4,
+      metalness: 0.7,
+      emissive: 0x112244,
+      emissiveIntensity: 0.3,
+      transparent: true,
+      opacity: 0,
+    });
+    const panel = new THREE.Mesh(panelGeo, panelMat);
+    panel.position.x = side * 1.8;
+    group.add(panel);
+  }
+  
+  // Antena
+  const antennaGeo = new THREE.CylinderGeometry(0.02, 0.02, 1, 8);
+  const antennaMat = new THREE.MeshStandardMaterial({
+    color: 0xaaaaaa,
+    roughness: 0.5,
+    metalness: 0.8,
+    transparent: true,
+    opacity: 0,
+  });
+  const antenna = new THREE.Mesh(antennaGeo, antennaMat);
+  antenna.position.y = 0.9;
+  group.add(antenna);
+  
+  // Dish antena
+  const dishGeo = new THREE.SphereGeometry(0.3, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+  const dishMat = new THREE.MeshStandardMaterial({
+    color: 0xcccccc,
+    roughness: 0.3,
+    metalness: 0.9,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0,
+  });
+  const dish = new THREE.Mesh(dishGeo, dishMat);
+  dish.position.y = 1.4;
+  dish.rotation.x = Math.PI;
+  group.add(dish);
+  
+  return group;
+}
+
+// ====== STASIUN LUAR ANGKASA ======
+function createSpaceStation(): THREE.Group {
+  const group = new THREE.Group();
+  
+  // Modul utama (silinder besar)
+  const mainGeo = new THREE.CylinderGeometry(1.2, 1.2, 4, 16);
+  const mainMat = new THREE.MeshStandardMaterial({
+    color: 0x999999,
+    roughness: 0.4,
+    metalness: 0.8,
+    transparent: true,
+    opacity: 0,
+  });
+  const main = new THREE.Mesh(mainGeo, mainMat);
+  main.rotation.z = Math.PI / 2;
+  group.add(main);
+  
+  // Modul samping
+  for (let i = -1; i <= 1; i += 2) {
+    const sideGeo = new THREE.CylinderGeometry(0.8, 0.8, 2.5, 12);
+    const sideMat = new THREE.MeshStandardMaterial({
+      color: 0x888888,
+      roughness: 0.5,
+      metalness: 0.7,
+      transparent: true,
+      opacity: 0,
+    });
+    const side = new THREE.Mesh(sideGeo, sideMat);
+    side.position.y = i * 1.5;
+    group.add(side);
+  }
+  
+  // Panel surya besar
+  for (let side = -1; side <= 1; side += 2) {
+    const panelGeo = new THREE.BoxGeometry(4, 0.05, 1.5);
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0x223355,
+      roughness: 0.4,
+      metalness: 0.6,
+      emissive: 0x112233,
+      emissiveIntensity: 0.2,
+      transparent: true,
+      opacity: 0,
+    });
+    const panel = new THREE.Mesh(panelGeo, panelMat);
+    panel.position.x = side * 3;
+    group.add(panel);
+  }
+  
+  // Truss structure
+  const trussGeo = new THREE.BoxGeometry(8, 0.15, 0.15);
+  const trussMat = new THREE.MeshStandardMaterial({
+    color: 0x666666,
+    roughness: 0.6,
+    metalness: 0.9,
+    transparent: true,
+    opacity: 0,
+  });
+  const truss = new THREE.Mesh(trussGeo, trussMat);
+  truss.position.y = 0.5;
+  group.add(truss);
+  
+  return group;
+}
+
+// ====== LUBANG HITAM ======
+function createBlackHole(): THREE.Group {
+  const group = new THREE.Group();
+  
+  // Event horizon (bola hitam)
+  const holeGeo = new THREE.SphereGeometry(2, 32, 32);
+  const holeMat = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0,
+  });
+  const hole = new THREE.Mesh(holeGeo, holeMat);
+  group.add(hole);
+  
+  // Accretion disk (cincin materi)
+  const diskGeo = new THREE.RingGeometry(2.5, 5, 64);
+  const diskMat = new THREE.MeshBasicMaterial({
+    color: 0xff6600,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+  });
+  const disk = new THREE.Mesh(diskGeo, diskMat);
+  disk.rotation.x = Math.PI / 2;
+  group.add(disk);
+  
+  // Glow ring
+  const glowGeo = new THREE.RingGeometry(2.2, 2.8, 64);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xffaa00,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.rotation.x = Math.PI / 2;
+  group.add(glow);
+  
+  return group;
+}
+
+// ====== WORMHOLE / PORTAL ======
+function createWormhole(): THREE.Group {
+  const group = new THREE.Group();
+  
+  // Portal ring
+  const ringGeo = new THREE.TorusGeometry(3, 0.3, 16, 48);
+  const ringMat = new THREE.MeshStandardMaterial({
+    color: 0x6633ff,
+    emissive: 0x4422aa,
+    emissiveIntensity: 0.8,
+    roughness: 0.3,
+    metalness: 0.7,
+    transparent: true,
+    opacity: 0,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  group.add(ring);
+  
+  // Inner portal (disc)
+  const portalGeo = new THREE.CircleGeometry(2.8, 48);
+  const portalMat = new THREE.MeshBasicMaterial({
+    color: 0x8844ff,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+  });
+  const portal = new THREE.Mesh(portalGeo, portalMat);
+  group.add(portal);
+  
+  // Outer glow
+  const glowGeo = new THREE.TorusGeometry(3.5, 0.5, 16, 48);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xaa66ff,
+    transparent: true,
+    opacity: 0,
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  group.add(glow);
+  
+  return group;
+}
+
+// ====== KRISTAL ENERGI ======
+function createEnergyCrystal(): THREE.Group {
+  const group = new THREE.Group();
+  
+  // Kristal utama
+  const crystalGeo = new THREE.OctahedronGeometry(1.5);
+  const crystalMat = new THREE.MeshStandardMaterial({
+    color: 0x00ffcc,
+    emissive: 0x00aa88,
+    emissiveIntensity: 0.6,
+    roughness: 0.2,
+    metalness: 0.5,
+    transparent: true,
+    opacity: 0,
+  });
+  const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+  group.add(crystal);
+  
+  // Kristal kecil di sekitar
+  for (let i = 0; i < 4; i++) {
+    const smallGeo = new THREE.OctahedronGeometry(0.5 + Math.random() * 0.3);
+    const smallMat = new THREE.MeshStandardMaterial({
+      color: 0x00ffaa,
+      emissive: 0x008866,
+      emissiveIntensity: 0.5,
+      roughness: 0.3,
+      metalness: 0.6,
+      transparent: true,
+      opacity: 0,
+    });
+    const small = new THREE.Mesh(smallGeo, smallMat);
+    const angle = (i / 4) * Math.PI * 2;
+    small.position.set(
+      Math.cos(angle) * 2,
+      (Math.random() - 0.5) * 1.5,
+      Math.sin(angle) * 2
+    );
+    small.rotation.set(Math.random(), Math.random(), Math.random());
+    group.add(small);
+  }
+  
+  // Point light
+  const light = new THREE.PointLight(0x00ffcc, 2, 15);
+  group.add(light);
   
   return group;
 }
@@ -393,54 +607,20 @@ function createWreck(): THREE.Group {
   return group;
 }
 
-// ====== MATAHARI ======
+// ====== MATAHARI - hanya inti + cahaya ======
 function createSun(): THREE.Group {
   const group = new THREE.Group();
   
-  // Inti matahari - LEBIH BESAR
-  const sunGeo = new THREE.SphereGeometry(8, 48, 48);
+  // Inti matahari - solid, tidak transparan
+  const sunGeo = new THREE.SphereGeometry(5, 32, 32);
   const sunMat = new THREE.MeshBasicMaterial({
-    color: 0xffee55,
-    transparent: true,
-    opacity: 1.0,
+    color: 0xffffee,
+    transparent: false,
   });
   const sun = new THREE.Mesh(sunGeo, sunMat);
   group.add(sun);
   
-  // Glow layer 1 - LEBIH BESAR
-  const glow1Geo = new THREE.SphereGeometry(12, 48, 48);
-  const glow1Mat = new THREE.MeshBasicMaterial({
-    color: 0xffaa22,
-    transparent: true,
-    opacity: 0.5,
-    side: THREE.BackSide,
-  });
-  const glow1 = new THREE.Mesh(glow1Geo, glow1Mat);
-  group.add(glow1);
-  
-  // Glow layer 2 - LEBIH BESAR
-  const glow2Geo = new THREE.SphereGeometry(18, 48, 48);
-  const glow2Mat = new THREE.MeshBasicMaterial({
-    color: 0xff8800,
-    transparent: true,
-    opacity: 0.3,
-    side: THREE.BackSide,
-  });
-  const glow2 = new THREE.Mesh(glow2Geo, glow2Mat);
-  group.add(glow2);
-  
-  // Glow layer 3 - SANGAT BESAR
-  const glow3Geo = new THREE.SphereGeometry(25, 48, 48);
-  const glow3Mat = new THREE.MeshBasicMaterial({
-    color: 0xff6600,
-    transparent: true,
-    opacity: 0.15,
-    side: THREE.BackSide,
-  });
-  const glow3 = new THREE.Mesh(glow3Geo, glow3Mat);
-  group.add(glow3);
-  
-  // Point light SANGAT TERANG untuk menerangi sekitar
+  // Point light untuk efek cahaya
   const sunLight = new THREE.PointLight(0xffdd66, 8, 150);
   group.add(sunLight);
   
@@ -571,7 +751,7 @@ export default function SpaceEnvironment() {
     const SAFE_ZONE = 25;
     const MIN_SPAWN = 45;
     const MAX_SPAWN = 85;
-    const MAX_OBJECTS = 18;
+    const MAX_OBJECTS = 36; // 2x lebih banyak
     const FADE_IN_DURATION = 4;
 
     function isPositionSafe(pos: THREE.Vector3, radius: number): boolean {
@@ -591,30 +771,50 @@ export default function SpaceEnvironment() {
       let type: string;
       let baseOpacity: number;
 
-      if (rand < 0.35) {
+      if (rand < 0.20) {
         const size = 0.5 + Math.random() * 2.5;
         mesh = createAsteroid(size);
         type = 'asteroid';
         baseOpacity = 1.0;
-      } else if (rand < 0.50) {
+      } else if (rand < 0.32) {
         mesh = createPlanet();
         type = 'planet';
         baseOpacity = 1.0;
-      } else if (rand < 0.62) {
+      } else if (rand < 0.40) {
         mesh = createNebula();
         type = 'nebula';
         baseOpacity = 0.12;
-      } else if (rand < 0.78) {
+      } else if (rand < 0.50) {
         mesh = createDebris();
         type = 'debris';
         baseOpacity = 1.0;
-      } else if (rand < 0.90) {
+      } else if (rand < 0.58) {
         mesh = createComet();
         type = 'comet';
         baseOpacity = 1.0;
-      } else {
+      } else if (rand < 0.65) {
         mesh = createWreck();
         type = 'wreck';
+        baseOpacity = 1.0;
+      } else if (rand < 0.73) {
+        mesh = createSatellite();
+        type = 'satellite';
+        baseOpacity = 1.0;
+      } else if (rand < 0.81) {
+        mesh = createSpaceStation();
+        type = 'station';
+        baseOpacity = 1.0;
+      } else if (rand < 0.88) {
+        mesh = createBlackHole();
+        type = 'blackhole';
+        baseOpacity = 1.0;
+      } else if (rand < 0.94) {
+        mesh = createWormhole();
+        type = 'wormhole';
+        baseOpacity = 1.0;
+      } else {
+        mesh = createEnergyCrystal();
+        type = 'crystal';
         baseOpacity = 1.0;
       }
 
@@ -672,7 +872,8 @@ export default function SpaceEnvironment() {
       return true;
     }
 
-    for (let i = 0; i < 15; i++) {
+    // Spawn awal - lebih banyak untuk populate scene
+    for (let i = 0; i < 25; i++) {
       spawnObject();
     }
 
@@ -813,9 +1014,9 @@ export default function SpaceEnvironment() {
         }
       }
 
-      // ====== LOOP SPAWN ======
+      // ====== LOOP SPAWN - 2x lebih cepat ======
       spawnTimer += delta;
-      if (objects.length < MAX_OBJECTS && spawnTimer > 1.0) {
+      if (objects.length < MAX_OBJECTS && spawnTimer > 0.5) {
         spawnObject();
         spawnTimer = 0;
       }
