@@ -916,34 +916,34 @@ function createWreck(): THREE.Group {
   return group;
 }
 
-// ====== MATAHARI - bulat sempurna ======
+// ====== MATAHARI - bulat sempurna 2x lebih besar ======
 function createSun(): THREE.Group {
   const group = new THREE.Group();
   
-  // ====== INTI MATAHARI - bulat sempurna ======
-  const sunGeo = new THREE.SphereGeometry(3, 64, 64);
+  // ====== INTI MATAHARI - bulat sempurna 2x ======
+  const sunGeo = new THREE.SphereGeometry(6, 64, 64);
   const sunMat = new THREE.MeshBasicMaterial({
     color: 0xffffff,
   });
   const sun = new THREE.Mesh(sunGeo, sunMat);
   group.add(sun);
   
-  // ====== SOLAR FLARE PARTICLES - partikel yang meletup ======
-  const flareCount = 300;
+  // ====== SOLAR FLARE PARTICLES - 2x lebih banyak ======
+  const flareCount = 600;
   const flarePositions = new Float32Array(flareCount * 3);
   const flareColors = new Float32Array(flareCount * 3);
   
   for (let i = 0; i < flareCount; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const r = 3.1 + Math.random() * 6;
+    const r = 6.2 + Math.random() * 12;
     
     flarePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
     flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
     flarePositions[i * 3 + 2] = r * Math.cos(phi);
     
     // Warna gradient: putih (dekat) → kuning → oranye (jauh)
-    const t = (r - 3.1) / 6;
+    const t = (r - 6.2) / 12;
     flareColors[i * 3] = 1.0;
     flareColors[i * 3 + 1] = 0.95 - t * 0.45;
     flareColors[i * 3 + 2] = 0.8 - t * 0.7;
@@ -954,7 +954,7 @@ function createSun(): THREE.Group {
   flareGeo.setAttribute('color', new THREE.BufferAttribute(flareColors, 3));
   
   const flareMat = new THREE.PointsMaterial({
-    size: 0.35,
+    size: 0.5,
     vertexColors: true,
     transparent: true,
     opacity: 0.85,
@@ -965,11 +965,11 @@ function createSun(): THREE.Group {
   const flareParticles = new THREE.Points(flareGeo, flareMat);
   group.add(flareParticles);
   
-  // ====== LIGHTS ======
-  const sunLight = new THREE.PointLight(0xfff5dd, 50, 400, 1.8);
+  // ====== LIGHTS - 2x lebih kuat ======
+  const sunLight = new THREE.PointLight(0xfff5dd, 100, 600, 1.8);
   group.add(sunLight);
   
-  const fillLight = new THREE.PointLight(0xffaa44, 20, 300, 2);
+  const fillLight = new THREE.PointLight(0xffaa44, 40, 450, 2);
   group.add(fillLight);
   
   return group;
@@ -1026,10 +1026,10 @@ export default function SpaceEnvironment() {
 
     // ====== SCENE ======
     const scene = new THREE.Scene();
-    // Background kabut tebal - batas jarak pandang
-    scene.background = new THREE.Color(0x0d0a08);
-    // Fog SANGAT TEBAL - objek muncul dari ketiadaan
-    scene.fog = new THREE.FogExp2(0x0d0a08, 0.025);
+    // Background kabut yang teriluminasi matahari - warm golden tint
+    scene.background = new THREE.Color(0x2a1f15);
+    // Fog tebal dengan warna warm - terlihat karena cahaya matahari
+    scene.fog = new THREE.FogExp2(0x3d2e1f, 0.022);
 
     // ====== CAMERA ======
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 300);
@@ -1050,12 +1050,12 @@ export default function SpaceEnvironment() {
     composer.addPass(bloomPass);
 
     // ====== LIGHTING - hanya dari matahari (seperti tata surya asli) ======
-    // Ambient light SANGAT REDUP - hanya untuk sedikit visibility
-    const ambientLight = new THREE.AmbientLight(0x111111, 0.15);
+    // Ambient light untuk light scattering di kabut - 2x lebih terang
+    const ambientLight = new THREE.AmbientLight(0x443322, 0.6);
     scene.add(ambientLight);
     
-    // Cahaya utama dari matahari (akan di-update posisinya)
-    const mainLight = new THREE.DirectionalLight(0xffeebb, 5.0);
+    // Cahaya utama dari matahari (akan di-update posisinya) - 2x lebih kuat
+    const mainLight = new THREE.DirectionalLight(0xffeebb, 10.0);
     mainLight.position.set(0, 3, -35);
     mainLight.castShadow = false;
     scene.add(mainLight);
@@ -1070,7 +1070,49 @@ export default function SpaceEnvironment() {
     const SUN_OFFSET = new THREE.Vector3(0, 8, -80); // matahari jauh di depan
     const SUN_SAFE_RADIUS = 18; // radius aman dari matahari
 
-    // Background adalah kabut tebal, tidak ada bintang
+    // ====== VOLUMETRIC FOG PARTICLES - kabut yang terlihat karena cahaya matahari ======
+    const fogParticleCount = 2000;
+    const fogPositions = new Float32Array(fogParticleCount * 3);
+    const fogColors = new Float32Array(fogParticleCount * 3);
+    const fogSizes = new Float32Array(fogParticleCount);
+    
+    for (let i = 0; i < fogParticleCount; i++) {
+      // Distribusi di sekitar kamera dalam radius besar
+      const r = 20 + Math.random() * 80;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      
+      fogPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      fogPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      fogPositions[i * 3 + 2] = r * Math.cos(phi);
+      
+      // Warna warm golden - seperti kabut yang terkena cahaya matahari
+      const brightness = 0.3 + Math.random() * 0.4;
+      fogColors[i * 3] = 0.8 * brightness;     // R
+      fogColors[i * 3 + 1] = 0.6 * brightness; // G
+      fogColors[i * 3 + 2] = 0.3 * brightness; // B
+      
+      // Ukuran bervariasi - partikel besar untuk efek volumetric
+      fogSizes[i] = 3 + Math.random() * 8;
+    }
+    
+    const fogGeo = new THREE.BufferGeometry();
+    fogGeo.setAttribute('position', new THREE.BufferAttribute(fogPositions, 3));
+    fogGeo.setAttribute('color', new THREE.BufferAttribute(fogColors, 3));
+    fogGeo.setAttribute('size', new THREE.BufferAttribute(fogSizes, 1));
+    
+    const fogMat = new THREE.PointsMaterial({
+      size: 6,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.15,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    
+    const fogParticles = new THREE.Points(fogGeo, fogMat);
+    scene.add(fogParticles);
 
     // ====== OBJECT POOL ======
     interface SpaceObj {
@@ -1301,7 +1343,8 @@ export default function SpaceEnvironment() {
         camera.position.add(cameraVelocity.clone().multiplyScalar(delta));
       }
 
-      // Tidak ada star field, background adalah kabut
+      // Update fog particles mengikuti kamera
+      fogParticles.position.copy(camera.position);
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
       const sunWorldOffset = SUN_OFFSET.clone().applyQuaternion(camera.quaternion);
@@ -1310,11 +1353,11 @@ export default function SpaceEnvironment() {
       // Update directional light mengikuti matahari
       mainLight.position.copy(sun.position);
       
-      // Update intensity matahari dari slider (2x lipat)
+      // Update intensity matahari dari slider (4x lipat dari base)
       if (sunLight) {
-        sunLight.intensity = sunIntensityRef.current * 10;
+        sunLight.intensity = sunIntensityRef.current * 20;
       }
-      mainLight.intensity = sunIntensityRef.current * 2.0;
+      mainLight.intensity = sunIntensityRef.current * 4.0;
       
       // ====== ANIMASI PARTIKEL MATAHARI ======
       // Animasi solar flare particles - bergerak keluar dari inti
@@ -1328,17 +1371,17 @@ export default function SpaceEnvironment() {
             const dist = Math.sqrt(x * x + y * y + z * z);
             
             // Gerak keluar perlahan
-            if (dist > 3 && dist < 9) {
-              const speed = 0.03;
+            if (dist > 6 && dist < 18) {
+              const speed = 0.04;
               const nx = x / dist;
               const ny = y / dist;
               const nz = z / dist;
               positions.setXYZ(i, x + nx * speed, y + ny * speed, z + nz * speed);
-            } else if (dist >= 9) {
+            } else if (dist >= 18) {
               // Reset ke permukaan
               const theta = Math.random() * Math.PI * 2;
               const phi = Math.acos(2 * Math.random() - 1);
-              const r = 3.05 + Math.random() * 0.2;
+              const r = 6.1 + Math.random() * 0.3;
               positions.setXYZ(
                 i,
                 r * Math.sin(phi) * Math.cos(theta),
