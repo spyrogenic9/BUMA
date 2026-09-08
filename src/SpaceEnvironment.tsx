@@ -1070,49 +1070,118 @@ export default function SpaceEnvironment() {
     const SUN_OFFSET = new THREE.Vector3(0, 8, -80); // matahari jauh di depan
     const SUN_SAFE_RADIUS = 18; // radius aman dari matahari
 
-    // ====== VOLUMETRIC FOG PARTICLES - kabut yang terlihat karena cahaya matahari ======
-    const fogParticleCount = 2000;
-    const fogPositions = new Float32Array(fogParticleCount * 3);
-    const fogColors = new Float32Array(fogParticleCount * 3);
-    const fogSizes = new Float32Array(fogParticleCount);
+    // ====== VOLUMETRIC FOG PARTICLES - kabut berkualitas tinggi ======
+    // Layer 1: Kabut dekat - partikel besar, opacity tinggi
+    const fogNearCount = 1500;
+    const fogNearPositions = new Float32Array(fogNearCount * 3);
+    const fogNearColors = new Float32Array(fogNearCount * 3);
     
-    for (let i = 0; i < fogParticleCount; i++) {
-      // Distribusi di sekitar kamera dalam radius besar
-      const r = 20 + Math.random() * 80;
+    for (let i = 0; i < fogNearCount; i++) {
+      const r = 15 + Math.random() * 40;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       
-      fogPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      fogPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      fogPositions[i * 3 + 2] = r * Math.cos(phi);
+      fogNearPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      fogNearPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.6; // lebih pipih
+      fogNearPositions[i * 3 + 2] = r * Math.cos(phi);
       
-      // Warna warm golden - seperti kabut yang terkena cahaya matahari
-      const brightness = 0.3 + Math.random() * 0.4;
-      fogColors[i * 3] = 0.8 * brightness;     // R
-      fogColors[i * 3 + 1] = 0.6 * brightness; // G
-      fogColors[i * 3 + 2] = 0.3 * brightness; // B
-      
-      // Ukuran bervariasi - partikel besar untuk efek volumetric
-      fogSizes[i] = 3 + Math.random() * 8;
+      // Warna warm golden terang
+      const brightness = 0.5 + Math.random() * 0.3;
+      fogNearColors[i * 3] = 0.9 * brightness;
+      fogNearColors[i * 3 + 1] = 0.7 * brightness;
+      fogNearColors[i * 3 + 2] = 0.4 * brightness;
     }
     
-    const fogGeo = new THREE.BufferGeometry();
-    fogGeo.setAttribute('position', new THREE.BufferAttribute(fogPositions, 3));
-    fogGeo.setAttribute('color', new THREE.BufferAttribute(fogColors, 3));
-    fogGeo.setAttribute('size', new THREE.BufferAttribute(fogSizes, 1));
+    const fogNearGeo = new THREE.BufferGeometry();
+    fogNearGeo.setAttribute('position', new THREE.BufferAttribute(fogNearPositions, 3));
+    fogNearGeo.setAttribute('color', new THREE.BufferAttribute(fogNearColors, 3));
     
-    const fogMat = new THREE.PointsMaterial({
-      size: 6,
+    const fogNearMat = new THREE.PointsMaterial({
+      size: 25,
       vertexColors: true,
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.4,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
     });
     
-    const fogParticles = new THREE.Points(fogGeo, fogMat);
-    scene.add(fogParticles);
+    const fogNearParticles = new THREE.Points(fogNearGeo, fogNearMat);
+    scene.add(fogNearParticles);
+    
+    // Layer 2: Kabut menengah - partikel sedang
+    const fogMidCount = 2000;
+    const fogMidPositions = new Float32Array(fogMidCount * 3);
+    const fogMidColors = new Float32Array(fogMidCount * 3);
+    
+    for (let i = 0; i < fogMidCount; i++) {
+      const r = 30 + Math.random() * 60;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      
+      fogMidPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      fogMidPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.7;
+      fogMidPositions[i * 3 + 2] = r * Math.cos(phi);
+      
+      const brightness = 0.4 + Math.random() * 0.3;
+      fogMidColors[i * 3] = 0.85 * brightness;
+      fogMidColors[i * 3 + 1] = 0.65 * brightness;
+      fogMidColors[i * 3 + 2] = 0.35 * brightness;
+    }
+    
+    const fogMidGeo = new THREE.BufferGeometry();
+    fogMidGeo.setAttribute('position', new THREE.BufferAttribute(fogMidPositions, 3));
+    fogMidGeo.setAttribute('color', new THREE.BufferAttribute(fogMidColors, 3));
+    
+    const fogMidMat = new THREE.PointsMaterial({
+      size: 18,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.3,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    
+    const fogMidParticles = new THREE.Points(fogMidGeo, fogMidMat);
+    scene.add(fogMidParticles);
+    
+    // Layer 3: Kabut jauh - partikel kecil, banyak
+    const fogFarCount = 2500;
+    const fogFarPositions = new Float32Array(fogFarCount * 3);
+    const fogFarColors = new Float32Array(fogFarCount * 3);
+    
+    for (let i = 0; i < fogFarCount; i++) {
+      const r = 50 + Math.random() * 80;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      
+      fogFarPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      fogFarPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.8;
+      fogFarPositions[i * 3 + 2] = r * Math.cos(phi);
+      
+      const brightness = 0.3 + Math.random() * 0.25;
+      fogFarColors[i * 3] = 0.8 * brightness;
+      fogFarColors[i * 3 + 1] = 0.6 * brightness;
+      fogFarColors[i * 3 + 2] = 0.3 * brightness;
+    }
+    
+    const fogFarGeo = new THREE.BufferGeometry();
+    fogFarGeo.setAttribute('position', new THREE.BufferAttribute(fogFarPositions, 3));
+    fogFarGeo.setAttribute('color', new THREE.BufferAttribute(fogFarColors, 3));
+    
+    const fogFarMat = new THREE.PointsMaterial({
+      size: 12,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.25,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
+    });
+    
+    const fogFarParticles = new THREE.Points(fogFarGeo, fogFarMat);
+    scene.add(fogFarParticles);
 
     // ====== OBJECT POOL ======
     interface SpaceObj {
@@ -1131,11 +1200,12 @@ export default function SpaceEnvironment() {
     const FADE_OUT_NEAR = 10;  // mulai pudar saat dekat kamera
     const FADE_OUT_GONE = 3;   // hilang total
     const REMOVE_DIST = 1;     // hapus dari scene
-    const SAFE_ZONE = 12;      // jarak aman dari kamera
-    const MIN_SPAWN = 30;      // spawn jarak minimum
+    const SAFE_ZONE = 20;      // jarak aman dari kamera (diperbesar)
+    const MIN_SPAWN = 35;      // spawn jarak minimum (diperbesar)
     const MAX_SPAWN = 65;      // spawn jarak maximum
     const MAX_OBJECTS = 45;    // lebih banyak objek
     const FADE_IN_DURATION = 3; // fade-in lebih cepat
+    const SUN_SAFE_DISTANCE = 35; // jarak aman dari matahari (diperbesar)
 
     function isPositionSafe(pos: THREE.Vector3, radius: number): boolean {
       const camDist = camera.position.distanceTo(pos);
@@ -1143,11 +1213,11 @@ export default function SpaceEnvironment() {
       
       // Jangan spawn terlalu dekat matahari
       const sunDist = pos.distanceTo(sun.position);
-      if (sunDist < 20 + radius) return false;
+      if (sunDist < SUN_SAFE_DISTANCE + radius) return false;
       
       for (const obj of objects) {
         const dist = pos.distanceTo(obj.mesh.position);
-        const minDist = radius + obj.radius + 3;
+        const minDist = radius + obj.radius + 4;
         if (dist < minDist) return false;
       }
       return true;
@@ -1344,7 +1414,9 @@ export default function SpaceEnvironment() {
       }
 
       // Update fog particles mengikuti kamera
-      fogParticles.position.copy(camera.position);
+      fogNearParticles.position.copy(camera.position);
+      fogMidParticles.position.copy(camera.position);
+      fogFarParticles.position.copy(camera.position);
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
       const sunWorldOffset = SUN_OFFSET.clone().applyQuaternion(camera.quaternion);
@@ -1407,6 +1479,7 @@ export default function SpaceEnvironment() {
       for (let i = objects.length - 1; i >= 0; i--) {
         const obj = objects[i];
         const dist = camera.position.distanceTo(obj.mesh.position);
+        const distToSun = sun.position.distanceTo(obj.mesh.position);
 
         obj.age += delta;
 
@@ -1415,6 +1488,21 @@ export default function SpaceEnvironment() {
         obj.mesh.rotation.z += obj.rotSpeed.z;
 
         obj.mesh.position.add(obj.driftVel.clone().multiplyScalar(delta));
+
+        // ====== ANTI-TABRAKAN: Push menjauh dari kamera dan matahari ======
+        if (dist < SAFE_ZONE + obj.radius) {
+          // Terlalu dekat kamera - push menjauh
+          const pushDir = obj.mesh.position.clone().sub(camera.position).normalize();
+          const pushStrength = (SAFE_ZONE + obj.radius - dist) * 0.5;
+          obj.mesh.position.add(pushDir.multiplyScalar(pushStrength));
+        }
+        
+        if (distToSun < SUN_SAFE_DISTANCE + obj.radius) {
+          // Terlalu dekat matahari - push menjauh
+          const pushDir = obj.mesh.position.clone().sub(sun.position).normalize();
+          const pushStrength = (SUN_SAFE_DISTANCE + obj.radius - distToSun) * 0.5;
+          obj.mesh.position.add(pushDir.multiplyScalar(pushStrength));
+        }
 
         // ====== FADE ======
         let spawnFade = Math.min(obj.age / FADE_IN_DURATION, 1.0);
