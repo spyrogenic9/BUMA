@@ -1167,6 +1167,7 @@ export default function SpaceEnvironment() {
     fogNearGeo.setAttribute('color', new THREE.BufferAttribute(fogNearColors, 3));
     
     // Custom shader material untuk kabut yang TIDAK BISA DIUBAH oleh three.js
+    // PENTING: fog: false untuk ignore scene fog!
     const fogNearMat = new THREE.ShaderMaterial({
       uniforms: {
         opacity: { value: 0.35 },
@@ -1196,6 +1197,7 @@ export default function SpaceEnvironment() {
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      fog: false, // IGNORE SCENE FOG!
     });
     
     const fogNearParticles = new THREE.Points(fogNearGeo, fogNearMat);
@@ -1231,6 +1233,7 @@ export default function SpaceEnvironment() {
     fogMidGeo.setAttribute('color', new THREE.BufferAttribute(fogMidColors, 3));
     
     // Custom shader material untuk kabut yang TIDAK BISA DIUBAH oleh three.js
+    // PENTING: fog: false untuk ignore scene fog!
     const fogMidMat = new THREE.ShaderMaterial({
       uniforms: {
         opacity: { value: 0.25 },
@@ -1260,6 +1263,7 @@ export default function SpaceEnvironment() {
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      fog: false, // IGNORE SCENE FOG!
     });
     
     const fogMidParticles = new THREE.Points(fogMidGeo, fogMidMat);
@@ -1295,6 +1299,7 @@ export default function SpaceEnvironment() {
     fogFarGeo.setAttribute('color', new THREE.BufferAttribute(fogFarColors, 3));
     
     // Custom shader material untuk kabut yang TIDAK BISA DIUBAH oleh three.js
+    // PENTING: fog: false untuk ignore scene fog!
     const fogFarMat = new THREE.ShaderMaterial({
       uniforms: {
         opacity: { value: 0.18 },
@@ -1324,6 +1329,7 @@ export default function SpaceEnvironment() {
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      fog: false, // IGNORE SCENE FOG!
     });
     
     const fogFarParticles = new THREE.Points(fogFarGeo, fogFarMat);
