@@ -1,157 +1,190 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
 type Mode = 'free' | 'auto';
 
-// ====== ASTEROID - kualitas tinggi ======
+// ====== ASTEROID - ultra realistis ======
 function createAsteroid(size: number): THREE.Mesh {
-  const geo = new THREE.IcosahedronGeometry(size, 3); // detail lebih tinggi
+  const geo = new THREE.IcosahedronGeometry(size, 4); // detail sangat tinggi
   const pos = geo.attributes.position;
   
-  // Displacement dengan noise multi-layer
+  // Displacement dengan noise multi-layer untuk bentuk tidak beraturan
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const z = pos.getZ(i);
     const len = Math.sqrt(x * x + y * y + z * z);
     
-    // Multi-octave noise
-    const noise1 = 0.6 + Math.random() * 0.8;
-    const noise2 = 0.8 + Math.sin(x * 2) * 0.1 + Math.cos(y * 2) * 0.1;
-    const finalNoise = noise1 * noise2;
+    // Multi-octave noise untuk variasi permukaan
+    const noise1 = 0.5 + Math.random() * 1.0;
+    const noise2 = 0.7 + Math.sin(x * 3) * 0.15 + Math.cos(y * 3) * 0.15;
+    const noise3 = 0.85 + Math.sin(z * 5) * 0.08;
+    const finalNoise = noise1 * noise2 * noise3;
     
     pos.setXYZ(i, (x / len) * size * finalNoise, (y / len) * size * finalNoise, (z / len) * size * finalNoise);
   }
   geo.computeVertexNormals();
   
-  // Warna batuan dengan variasi mineral
-  const baseGray = 0.06 + Math.random() * 0.1;
+  // Warna batuan dengan variasi mineral realistis
+  const baseGray = 0.08 + Math.random() * 0.12;
   const mineralTint = Math.random();
   let color: THREE.Color;
   
-  if (mineralTint < 0.3) {
-    // Besi/rust
-    color = new THREE.Color(baseGray * 1.2, baseGray * 0.8, baseGray * 0.7);
-  } else if (mineralTint < 0.6) {
-    // Silicate
+  if (mineralTint < 0.25) {
+    // Besi berkarat
+    color = new THREE.Color(baseGray * 1.3, baseGray * 0.7, baseGray * 0.6);
+  } else if (mineralTint < 0.5) {
+    // Silikat abu-abu
     color = new THREE.Color(baseGray, baseGray * 0.95, baseGray * 0.9);
-  } else {
+  } else if (mineralTint < 0.75) {
     // Karbon gelap
-    color = new THREE.Color(baseGray * 0.7, baseGray * 0.7, baseGray * 0.75);
+    color = new THREE.Color(baseGray * 0.6, baseGray * 0.6, baseGray * 0.65);
+  } else {
+    // Nikel-besi metalik
+    color = new THREE.Color(baseGray * 1.1, baseGray * 1.05, baseGray * 1.0);
   }
   
   const mat = new THREE.MeshStandardMaterial({
     color,
-    roughness: 0.92 + Math.random() * 0.08,
-    metalness: 0.08 + Math.random() * 0.15,
+    roughness: 0.85 + Math.random() * 0.15,
+    metalness: 0.1 + Math.random() * 0.25,
     flatShading: true,
     transparent: true,
     opacity: 0,
+    envMapIntensity: 0.5,
   });
   
   return new THREE.Mesh(geo, mat);
 }
 
-// ====== PLANET - kualitas tinggi dengan atmosfer ======
+// ====== PLANET - ultra realistis dengan atmosfer detail ======
 function createPlanet(): THREE.Group {
   const group = new THREE.Group();
-  const radius = 4 + Math.random() * 8;
+  const radius = 4 + Math.random() * 10;
   
-  // Body planet dengan detail tinggi
-  const geo = new THREE.SphereGeometry(radius, 64, 64);
+  // Body planet dengan detail sangat tinggi
+  const geo = new THREE.SphereGeometry(radius, 96, 96);
   const pos = geo.attributes.position;
   
-  // Surface variation halus
+  // Surface variation dengan noise kompleks
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const z = pos.getZ(i);
     const len = Math.sqrt(x * x + y * y + z * z);
     
-    // Terrain noise
-    const terrainNoise = 1 + (Math.random() - 0.5) * 0.008;
-    const latitudinalBand = 1 + Math.sin(y / radius * Math.PI * 3) * 0.01;
-    const bump = terrainNoise * latitudinalBand;
+    // Multi-layer terrain noise
+    const terrainNoise = 1 + (Math.random() - 0.5) * 0.006;
+    const latitudinalBand = 1 + Math.sin(y / radius * Math.PI * 4) * 0.008;
+    const longitudinalVar = 1 + Math.sin(x / radius * Math.PI * 3) * 0.005;
+    const bump = terrainNoise * latitudinalBand * longitudinalVar;
     
     pos.setXYZ(i, (x / len) * radius * bump, (y / len) * radius * bump, (z / len) * radius * bump);
   }
   geo.computeVertexNormals();
   
-  // Warna planet bervariasi
-  const isGasGiant = Math.random() > 0.4;
+  // Warna planet bervariasi dengan lebih banyak tipe
+  const isGasGiant = Math.random() > 0.35;
   let color: THREE.Color;
   
   if (isGasGiant) {
     const gasTypes = [
-      { hue: 0.05, sat: 0.5, light: 0.25 }, // Jupiter-like
-      { hue: 0.08, sat: 0.4, light: 0.2 },  // Saturn-like
-      { hue: 0.55, sat: 0.6, light: 0.3 },  // Neptune-like
-      { hue: 0.6, sat: 0.5, light: 0.25 },  // Uranus-like
-      { hue: 0.75, sat: 0.4, light: 0.2 },  // Purple giant
+      { hue: 0.05, sat: 0.55, light: 0.28 }, // Jupiter-like
+      { hue: 0.08, sat: 0.45, light: 0.22 },  // Saturn-like
+      { hue: 0.55, sat: 0.65, light: 0.32 },  // Neptune-like
+      { hue: 0.6, sat: 0.55, light: 0.28 },   // Uranus-like
+      { hue: 0.75, sat: 0.45, light: 0.22 },  // Purple giant
+      { hue: 0.02, sat: 0.6, light: 0.3 },    // Hot Jupiter
+      { hue: 0.12, sat: 0.5, light: 0.25 },   // Brown dwarf
     ];
     const gasType = gasTypes[Math.floor(Math.random() * gasTypes.length)];
     color = new THREE.Color().setHSL(
-      gasType.hue + (Math.random() - 0.5) * 0.03,
-      gasType.sat + Math.random() * 0.2,
-      gasType.light + Math.random() * 0.1
+      gasType.hue + (Math.random() - 0.5) * 0.04,
+      gasType.sat + Math.random() * 0.25,
+      gasType.light + Math.random() * 0.12
     );
   } else {
-    // Rocky planet
+    // Rocky planet dengan lebih banyak variasi
     const rockyTypes = [
-      new THREE.Color(0.2, 0.15, 0.1),  // Mars-like
-      new THREE.Color(0.15, 0.18, 0.12), // Earth-like (land)
-      new THREE.Color(0.12, 0.12, 0.15), // Moon-like
+      new THREE.Color(0.22, 0.15, 0.1),   // Mars-like
+      new THREE.Color(0.15, 0.2, 0.12),   // Earth-like (land)
+      new THREE.Color(0.12, 0.12, 0.15),  // Moon-like
+      new THREE.Color(0.18, 0.14, 0.11),  // Mercury-like
+      new THREE.Color(0.25, 0.18, 0.12),  // Venus-like
     ];
     color = rockyTypes[Math.floor(Math.random() * rockyTypes.length)];
   }
   
   const mat = new THREE.MeshStandardMaterial({
     color,
-    roughness: isGasGiant ? 0.5 : 0.8,
-    metalness: 0.05,
+    roughness: isGasGiant ? 0.45 : 0.75,
+    metalness: 0.08,
     transparent: true,
     opacity: 0,
+    envMapIntensity: 0.8,
   });
   
   const planet = new THREE.Mesh(geo, mat);
   group.add(planet);
   
-  // Atmosfer glow
-  if (Math.random() > 0.3) {
-    const atmosGeo = new THREE.SphereGeometry(radius * 1.05, 32, 32);
+  // Atmosfer glow multi-layer
+  if (Math.random() > 0.25) {
+    // Inner atmosphere
+    const atmos1Geo = new THREE.SphereGeometry(radius * 1.03, 48, 48);
     const atmosColor = isGasGiant 
-      ? new THREE.Color().setHSL(Math.random() * 0.2 + 0.5, 0.5, 0.5)
-      : new THREE.Color(0.3, 0.5, 0.8);
+      ? new THREE.Color().setHSL(Math.random() * 0.2 + 0.5, 0.6, 0.5)
+      : new THREE.Color(0.3, 0.55, 0.85);
     
-    const atmosMat = new THREE.MeshBasicMaterial({
+    const atmos1Mat = new THREE.MeshBasicMaterial({
       color: atmosColor,
       transparent: true,
       opacity: 0,
       side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
-    const atmos = new THREE.Mesh(atmosGeo, atmosMat);
-    group.add(atmos);
+    const atmos1 = new THREE.Mesh(atmos1Geo, atmos1Mat);
+    group.add(atmos1);
+    
+    // Outer atmosphere
+    const atmos2Geo = new THREE.SphereGeometry(radius * 1.08, 48, 48);
+    const atmos2Mat = new THREE.MeshBasicMaterial({
+      color: atmosColor.clone().multiplyScalar(0.7),
+      transparent: true,
+      opacity: 0,
+      side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const atmos2 = new THREE.Mesh(atmos2Geo, atmos2Mat);
+    group.add(atmos2);
   }
   
-  // Cincin
-  if (Math.random() > 0.5) {
+  // Cincin dengan detail lebih baik
+  if (Math.random() > 0.45) {
     const innerR = radius * 1.3;
-    const outerR = radius * (1.8 + Math.random() * 0.5);
-    const ringGeo = new THREE.RingGeometry(innerR, outerR, 64);
+    const outerR = radius * (1.9 + Math.random() * 0.6);
+    const ringGeo = new THREE.RingGeometry(innerR, outerR, 96);
     
     // Warna cincin bervariasi
     const ringColors = [
+      new THREE.Color(0.45, 0.38, 0.32),
+      new THREE.Color(0.35, 0.28, 0.22),
+      new THREE.Color(0.52, 0.42, 0.38),
       new THREE.Color(0.4, 0.35, 0.3),
-      new THREE.Color(0.3, 0.25, 0.2),
-      new THREE.Color(0.5, 0.4, 0.35),
     ];
     
     const ringMat = new THREE.MeshStandardMaterial({
       color: ringColors[Math.floor(Math.random() * ringColors.length)],
-      roughness: 0.8,
+      roughness: 0.75,
+      metalness: 0.15,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0,
+      envMapIntensity: 0.6,
     });
     
     const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -163,53 +196,83 @@ function createPlanet(): THREE.Group {
   return group;
 }
 
-// ====== NEBULA - awan gas berkualitas ======
+// ====== NEBULA - volumetric realistis ======
 function createNebula(): THREE.Points {
-  const count = 100;
+  const count = 180; // lebih banyak partikel untuk volumetric look
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
-  const spread = 25 + Math.random() * 30;
+  const sizes = new Float32Array(count);
+  const spread = 30 + Math.random() * 35;
   
   const palettes = [
-    [[0.5, 0.2, 0.7], [0.6, 0.3, 0.8]],  // Ungu-pink
-    [[0.15, 0.3, 0.7], [0.2, 0.5, 0.9]], // Biru-cyan
-    [[0.7, 0.15, 0.3], [0.9, 0.3, 0.4]], // Merah-orange
-    [[0.2, 0.5, 0.7], [0.3, 0.7, 0.9]], // Cyan-teal
+    [[0.5, 0.2, 0.7], [0.65, 0.35, 0.85], [0.4, 0.15, 0.6]],  // Ungu-pink
+    [[0.15, 0.3, 0.7], [0.25, 0.55, 0.95], [0.1, 0.25, 0.6]], // Biru-cyan
+    [[0.7, 0.15, 0.3], [0.95, 0.35, 0.45], [0.6, 0.1, 0.25]], // Merah-orange
+    [[0.2, 0.5, 0.7], [0.35, 0.75, 0.95], [0.15, 0.4, 0.6]],  // Cyan-teal
+    [[0.6, 0.3, 0.5], [0.8, 0.4, 0.7], [0.5, 0.2, 0.4]],      // Magenta
   ];
   
   const palette = palettes[Math.floor(Math.random() * palettes.length)];
   const base = palette[0];
   const accent = palette[1];
+  const deep = palette[2];
   
   for (let i = 0; i < count; i++) {
-    const r = spread * Math.pow(Math.random(), 0.5);
+    // Distribusi gaussian untuk bentuk awan natural
+    const r = spread * Math.pow(Math.random(), 0.45);
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
     
     positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.35;
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.3; // lebih pipih
     positions[i * 3 + 2] = r * Math.cos(phi);
     
-    // Gradient warna
+    // Gradient warna multi-layer
     const t = Math.random();
-    const mixColor = [
-      base[0] * (1 - t) + accent[0] * t,
-      base[1] * (1 - t) + accent[1] * t,
-      base[2] * (1 - t) + accent[2] * t,
-    ];
+    let mixColor: number[];
+    if (t < 0.33) {
+      mixColor = [
+        base[0] * 0.8 + deep[0] * 0.2,
+        base[1] * 0.8 + deep[1] * 0.2,
+        base[2] * 0.8 + deep[2] * 0.2,
+      ];
+    } else if (t < 0.66) {
+      mixColor = [
+        base[0] * 0.5 + accent[0] * 0.5,
+        base[1] * 0.5 + accent[1] * 0.5,
+        base[2] * 0.5 + accent[2] * 0.5,
+      ];
+    } else {
+      mixColor = [
+        accent[0] * 0.7 + base[0] * 0.3,
+        accent[1] * 0.7 + base[1] * 0.3,
+        accent[2] * 0.7 + base[2] * 0.3,
+      ];
+    }
     
-    const brightness = 0.6 + Math.random() * 0.4;
+    const brightness = 0.5 + Math.random() * 0.5;
     colors[i * 3] = mixColor[0] * brightness;
     colors[i * 3 + 1] = mixColor[1] * brightness;
     colors[i * 3 + 2] = mixColor[2] * brightness;
+    
+    // Ukuran bervariasi untuk depth
+    const sizeRand = Math.random();
+    if (sizeRand > 0.9) {
+      sizes[i] = 6 + Math.random() * 4; // partikel besar
+    } else if (sizeRand > 0.6) {
+      sizes[i] = 4 + Math.random() * 2; // partikel sedang
+    } else {
+      sizes[i] = 2 + Math.random() * 2; // partikel kecil
+    }
   }
   
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
   
   const mat = new THREE.PointsMaterial({
-    size: 4,
+    size: 5,
     vertexColors: true,
     transparent: true,
     opacity: 0,
@@ -221,43 +284,84 @@ function createNebula(): THREE.Points {
   return new THREE.Points(geo, mat);
 }
 
-// ====== DEBRIS - puing berkualitas ======
+// ====== DEBRIS - puing ultra realistis ======
 function createDebris(): THREE.Group {
   const group = new THREE.Group();
-  const count = 1 + Math.floor(Math.random() * 2);
+  const count = 1 + Math.floor(Math.random() * 3);
   
   for (let i = 0; i < count; i++) {
-    const size = 0.3 + Math.random() * 0.6;
-    const type = Math.floor(Math.random() * 4);
+    const size = 0.3 + Math.random() * 0.7;
+    const type = Math.floor(Math.random() * 6);
     let geo: THREE.BufferGeometry;
     
     if (type === 0) {
-      geo = new THREE.BoxGeometry(size, size * 0.4, size * 0.3);
+      // Panel logam rusak
+      geo = new THREE.BoxGeometry(size, size * 0.3, size * 0.25);
     } else if (type === 1) {
+      // Pecahan segitiga
       geo = new THREE.TetrahedronGeometry(size);
     } else if (type === 2) {
+      // Kristal pecah
       geo = new THREE.OctahedronGeometry(size * 0.5);
+    } else if (type === 3) {
+      // Tabung/pipa
+      geo = new THREE.CylinderGeometry(size * 0.15, size * 0.15, size * 0.8, 8);
+    } else if (type === 4) {
+      // Plat melengkung
+      geo = new THREE.TorusGeometry(size * 0.4, size * 0.1, 8, 12, Math.PI * 0.7);
     } else {
-      geo = new THREE.CylinderGeometry(size * 0.2, size * 0.2, size, 6);
+      // Balok struktural
+      geo = new THREE.BoxGeometry(size * 0.8, size * 0.15, size * 0.15);
     }
     
-    const gray = 0.1 + Math.random() * 0.15;
-    const metalness = 0.7 + Math.random() * 0.3;
+    // Variasi material: logam, karbon, keramik
+    const materialType = Math.random();
+    let mat: THREE.MeshStandardMaterial;
     
-    const mat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(gray, gray, gray * 1.1),
-      roughness: 0.4 + Math.random() * 0.3,
-      metalness,
-      flatShading: true,
-      transparent: true,
-      opacity: 0,
-    });
+    if (materialType < 0.4) {
+      // Logam titanium/aluminium
+      const gray = 0.15 + Math.random() * 0.2;
+      mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(gray, gray, gray * 1.05),
+        roughness: 0.3 + Math.random() * 0.2,
+        metalness: 0.85 + Math.random() * 0.15,
+        flatShading: true,
+        transparent: true,
+        opacity: 0,
+        envMapIntensity: 1.0,
+      });
+    } else if (materialType < 0.7) {
+      // Karbon fiber gelap
+      mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(0.05, 0.05, 0.06),
+        roughness: 0.6 + Math.random() * 0.2,
+        metalness: 0.3 + Math.random() * 0.2,
+        flatShading: true,
+        transparent: true,
+        opacity: 0,
+      });
+    } else {
+      // Keramik/heat shield
+      const heatTint = Math.random();
+      mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(
+          0.15 + heatTint * 0.1,
+          0.1 + heatTint * 0.05,
+          0.08
+        ),
+        roughness: 0.7 + Math.random() * 0.2,
+        metalness: 0.1 + Math.random() * 0.2,
+        flatShading: true,
+        transparent: true,
+        opacity: 0,
+      });
+    }
     
     const piece = new THREE.Mesh(geo, mat);
     piece.position.set(
-      (Math.random() - 0.5) * 2.5,
-      (Math.random() - 0.5) * 2.5,
-      (Math.random() - 0.5) * 2.5
+      (Math.random() - 0.5) * 3,
+      (Math.random() - 0.5) * 3,
+      (Math.random() - 0.5) * 3
     );
     piece.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
     group.add(piece);
@@ -281,66 +385,140 @@ function createComet(): THREE.Mesh {
   return new THREE.Mesh(coreGeo, coreMat);
 }
 
-// ====== SATELIT ======
+// ====== SATELIT - ultra realistis ======
 function createSatellite(): THREE.Group {
   const group = new THREE.Group();
   
-  // Badan utama
-  const bodyGeo = new THREE.BoxGeometry(0.8, 0.8, 1.2);
+  // Badan utama - bus satelit
+  const bodyGeo = new THREE.BoxGeometry(0.9, 0.9, 1.4);
   const bodyMat = new THREE.MeshStandardMaterial({
-    color: 0x888899,
-    roughness: 0.3,
-    metalness: 0.9,
+    color: 0x999aaa,
+    roughness: 0.25,
+    metalness: 0.92,
     transparent: true,
     opacity: 0,
+    envMapIntensity: 1.2,
   });
   const body = new THREE.Mesh(bodyGeo, bodyMat);
   group.add(body);
   
-  // Panel surya (2 sisi)
+  // Thermal blanket (gold foil)
+  const foilGeo = new THREE.BoxGeometry(0.92, 0.92, 0.3);
+  const foilMat = new THREE.MeshStandardMaterial({
+    color: 0xccaa44,
+    roughness: 0.4,
+    metalness: 0.8,
+    emissive: 0x332200,
+    emissiveIntensity: 0.1,
+    transparent: true,
+    opacity: 0,
+  });
+  const foil = new THREE.Mesh(foilGeo, foilMat);
+  foil.position.z = 0.55;
+  group.add(foil);
+  
+  // Panel surya (2 sisi) - lebih detail
   for (let side = -1; side <= 1; side += 2) {
-    const panelGeo = new THREE.BoxGeometry(2.5, 0.05, 1);
-    const panelMat = new THREE.MeshStandardMaterial({
-      color: 0x223366,
+    // Arm connector
+    const armGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8);
+    const armMat = new THREE.MeshStandardMaterial({
+      color: 0x888888,
       roughness: 0.4,
-      metalness: 0.7,
-      emissive: 0x112244,
-      emissiveIntensity: 0.3,
+      metalness: 0.9,
       transparent: true,
       opacity: 0,
     });
+    const arm = new THREE.Mesh(armGeo, armMat);
+    arm.rotation.z = Math.PI / 2;
+    arm.position.x = side * 0.7;
+    group.add(arm);
+    
+    // Panel utama
+    const panelGeo = new THREE.BoxGeometry(2.8, 0.04, 1.2);
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0x1a2a55,
+      roughness: 0.35,
+      metalness: 0.75,
+      emissive: 0x0a1533,
+      emissiveIntensity: 0.4,
+      transparent: true,
+      opacity: 0,
+      envMapIntensity: 0.8,
+    });
     const panel = new THREE.Mesh(panelGeo, panelMat);
-    panel.position.x = side * 1.8;
+    panel.position.x = side * 2.1;
     group.add(panel);
+    
+    // Panel grid lines
+    for (let g = 0; g < 4; g++) {
+      const gridGeo = new THREE.BoxGeometry(2.8, 0.05, 0.01);
+      const gridMat = new THREE.MeshStandardMaterial({
+        color: 0x333355,
+        roughness: 0.5,
+        metalness: 0.8,
+        transparent: true,
+        opacity: 0,
+      });
+      const grid = new THREE.Mesh(gridGeo, gridMat);
+      grid.position.set(side * 2.1, 0.025, -0.45 + g * 0.3);
+      group.add(grid);
+    }
   }
   
-  // Antena
-  const antennaGeo = new THREE.CylinderGeometry(0.02, 0.02, 1, 8);
+  // Antena utama
+  const antennaGeo = new THREE.CylinderGeometry(0.025, 0.025, 1.2, 8);
   const antennaMat = new THREE.MeshStandardMaterial({
-    color: 0xaaaaaa,
-    roughness: 0.5,
-    metalness: 0.8,
+    color: 0xbbbbbb,
+    roughness: 0.4,
+    metalness: 0.85,
     transparent: true,
     opacity: 0,
   });
   const antenna = new THREE.Mesh(antennaGeo, antennaMat);
-  antenna.position.y = 0.9;
+  antenna.position.y = 1.05;
   group.add(antenna);
   
-  // Dish antena
-  const dishGeo = new THREE.SphereGeometry(0.3, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+  // Dish antena - lebih detail
+  const dishGeo = new THREE.SphereGeometry(0.35, 24, 24, 0, Math.PI * 2, 0, Math.PI / 2);
   const dishMat = new THREE.MeshStandardMaterial({
-    color: 0xcccccc,
-    roughness: 0.3,
-    metalness: 0.9,
+    color: 0xdddddd,
+    roughness: 0.2,
+    metalness: 0.95,
     side: THREE.DoubleSide,
     transparent: true,
     opacity: 0,
+    envMapIntensity: 1.5,
   });
   const dish = new THREE.Mesh(dishGeo, dishMat);
-  dish.position.y = 1.4;
+  dish.position.y = 1.65;
   dish.rotation.x = Math.PI;
   group.add(dish);
+  
+  // Feed horn
+  const feedGeo = new THREE.CylinderGeometry(0.04, 0.06, 0.2, 8);
+  const feedMat = new THREE.MeshStandardMaterial({
+    color: 0x999999,
+    roughness: 0.3,
+    metalness: 0.9,
+    transparent: true,
+    opacity: 0,
+  });
+  const feed = new THREE.Mesh(feedGeo, feedMat);
+  feed.position.y = 1.5;
+  group.add(feed);
+  
+  // Status lights
+  if (Math.random() > 0.4) {
+    const lightGeo = new THREE.SphereGeometry(0.04, 8, 8);
+    const lightMat = new THREE.MeshBasicMaterial({
+      color: Math.random() > 0.5 ? 0x00ff00 : 0xff0000,
+      transparent: true,
+      opacity: 0,
+    });
+    const light = new THREE.Mesh(lightGeo, lightMat);
+    light.position.set(0.45, 0, 0.7);
+    group.add(light);
+  }
   
   return group;
 }
@@ -410,12 +588,12 @@ function createSpaceStation(): THREE.Group {
   return group;
 }
 
-// ====== LUBANG HITAM ======
+// ====== LUBANG HITAM - ultra realistis ======
 function createBlackHole(): THREE.Group {
   const group = new THREE.Group();
   
-  // Event horizon (bola hitam)
-  const holeGeo = new THREE.SphereGeometry(2, 32, 32);
+  // Event horizon (bola hitam pekat)
+  const holeGeo = new THREE.SphereGeometry(2.5, 48, 48);
   const holeMat = new THREE.MeshBasicMaterial({
     color: 0x000000,
     transparent: true,
@@ -424,118 +602,249 @@ function createBlackHole(): THREE.Group {
   const hole = new THREE.Mesh(holeGeo, holeMat);
   group.add(hole);
   
-  // Accretion disk (cincin materi)
-  const diskGeo = new THREE.RingGeometry(2.5, 5, 64);
-  const diskMat = new THREE.MeshBasicMaterial({
-    color: 0xff6600,
-    transparent: true,
-    opacity: 0,
-    side: THREE.DoubleSide,
-  });
-  const disk = new THREE.Mesh(diskGeo, diskMat);
-  disk.rotation.x = Math.PI / 2;
-  group.add(disk);
-  
-  // Glow ring
-  const glowGeo = new THREE.RingGeometry(2.2, 2.8, 64);
-  const glowMat = new THREE.MeshBasicMaterial({
+  // Photon sphere (cincin cahaya di sekitar event horizon)
+  const photonGeo = new THREE.TorusGeometry(2.8, 0.15, 16, 64);
+  const photonMat = new THREE.MeshBasicMaterial({
     color: 0xffaa00,
     transparent: true,
     opacity: 0,
-    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
   });
-  const glow = new THREE.Mesh(glowGeo, glowMat);
-  glow.rotation.x = Math.PI / 2;
-  group.add(glow);
+  const photon = new THREE.Mesh(photonGeo, photonMat);
+  photon.rotation.x = Math.PI / 2;
+  group.add(photon);
+  
+  // Accretion disk inner - panas intens
+  const disk1Geo = new THREE.RingGeometry(3, 4.5, 96);
+  const disk1Mat = new THREE.MeshBasicMaterial({
+    color: 0xff8800,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const disk1 = new THREE.Mesh(disk1Geo, disk1Mat);
+  disk1.rotation.x = Math.PI / 2;
+  group.add(disk1);
+  
+  // Accretion disk outer - lebih dingin
+  const disk2Geo = new THREE.RingGeometry(4.5, 7, 96);
+  const disk2Mat = new THREE.MeshBasicMaterial({
+    color: 0xff4400,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const disk2 = new THREE.Mesh(disk2Geo, disk2Mat);
+  disk2.rotation.x = Math.PI / 2;
+  group.add(disk2);
+  
+  // Accretion disk extreme outer - sangat samar
+  const disk3Geo = new THREE.RingGeometry(7, 10, 96);
+  const disk3Mat = new THREE.MeshBasicMaterial({
+    color: 0xaa2200,
+    transparent: true,
+    opacity: 0,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const disk3 = new THREE.Mesh(disk3Geo, disk3Mat);
+  disk3.rotation.x = Math.PI / 2;
+  group.add(disk3);
+  
+  // Relativistic jets (opsional - semburan partikel)
+  if (Math.random() > 0.5) {
+    for (let dir = -1; dir <= 1; dir += 2) {
+      const jetGeo = new THREE.ConeGeometry(0.8, 8, 16);
+      const jetMat = new THREE.MeshBasicMaterial({
+        color: 0x4488ff,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const jet = new THREE.Mesh(jetGeo, jetMat);
+      jet.position.y = dir * 5;
+      jet.rotation.x = dir > 0 ? 0 : Math.PI;
+      group.add(jet);
+    }
+  }
+  
+  // Point light untuk efek glow
+  const bhLight = new THREE.PointLight(0xff6600, 3, 20);
+  group.add(bhLight);
   
   return group;
 }
 
-// ====== WORMHOLE / PORTAL ======
+// ====== WORMHOLE / PORTAL - ultra realistis ======
 function createWormhole(): THREE.Group {
   const group = new THREE.Group();
   
-  // Portal ring
-  const ringGeo = new THREE.TorusGeometry(3, 0.3, 16, 48);
+  // Portal ring utama - struktur stabil
+  const ringGeo = new THREE.TorusGeometry(3.5, 0.4, 24, 64);
   const ringMat = new THREE.MeshStandardMaterial({
-    color: 0x6633ff,
-    emissive: 0x4422aa,
-    emissiveIntensity: 0.8,
-    roughness: 0.3,
-    metalness: 0.7,
+    color: 0x7744ff,
+    emissive: 0x5533cc,
+    emissiveIntensity: 1.0,
+    roughness: 0.2,
+    metalness: 0.8,
     transparent: true,
     opacity: 0,
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
   group.add(ring);
   
-  // Inner portal (disc)
-  const portalGeo = new THREE.CircleGeometry(2.8, 48);
+  // Secondary ring - stabilitas
+  const ring2Geo = new THREE.TorusGeometry(3.8, 0.2, 16, 64);
+  const ring2Mat = new THREE.MeshStandardMaterial({
+    color: 0x9966ff,
+    emissive: 0x7744dd,
+    emissiveIntensity: 0.8,
+    roughness: 0.3,
+    metalness: 0.7,
+    transparent: true,
+    opacity: 0,
+  });
+  const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+  group.add(ring2);
+  
+  // Inner portal - singularitas
+  const portalGeo = new THREE.CircleGeometry(3.2, 64);
   const portalMat = new THREE.MeshBasicMaterial({
-    color: 0x8844ff,
+    color: 0xaa66ff,
     transparent: true,
     opacity: 0,
     side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
   });
   const portal = new THREE.Mesh(portalGeo, portalMat);
   group.add(portal);
   
-  // Outer glow
-  const glowGeo = new THREE.TorusGeometry(3.5, 0.5, 16, 48);
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xaa66ff,
+  // Event horizon glow
+  const glow1Geo = new THREE.TorusGeometry(3.2, 0.6, 24, 64);
+  const glow1Mat = new THREE.MeshBasicMaterial({
+    color: 0xbb88ff,
     transparent: true,
     opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
   });
-  const glow = new THREE.Mesh(glowGeo, glowMat);
-  group.add(glow);
+  const glow1 = new THREE.Mesh(glow1Geo, glow1Mat);
+  group.add(glow1);
+  
+  // Outer energy field
+  const glow2Geo = new THREE.TorusGeometry(4.2, 0.8, 24, 64);
+  const glow2Mat = new THREE.MeshBasicMaterial({
+    color: 0x9955ff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const glow2 = new THREE.Mesh(glow2Geo, glow2Mat);
+  group.add(glow2);
+  
+  // Point light untuk efek cahaya
+  const portalLight = new THREE.PointLight(0x8844ff, 4, 25);
+  group.add(portalLight);
   
   return group;
 }
 
-// ====== KRISTAL ENERGI ======
+// ====== KRISTAL ENERGI - ultra realistis ======
 function createEnergyCrystal(): THREE.Group {
   const group = new THREE.Group();
   
-  // Kristal utama
-  const crystalGeo = new THREE.OctahedronGeometry(1.5);
+  // Warna kristal bervariasi
+  const crystalColors = [
+    { color: 0x00ffcc, emissive: 0x00aa88, light: 0x00ffcc }, // Cyan
+    { color: 0xff00aa, emissive: 0xaa0077, light: 0xff00aa }, // Magenta
+    { color: 0xffaa00, emissive: 0xaa7700, light: 0xffaa00 }, // Gold
+    { color: 0x00aaff, emissive: 0x0077aa, light: 0x00aaff }, // Blue
+    { color: 0xaa00ff, emissive: 0x7700aa, light: 0xaa00ff }, // Purple
+  ];
+  
+  const colorSet = crystalColors[Math.floor(Math.random() * crystalColors.length)];
+  
+  // Kristal utama - bentuk hexagonal
+  const crystalGeo = new THREE.OctahedronGeometry(1.8, 0);
   const crystalMat = new THREE.MeshStandardMaterial({
-    color: 0x00ffcc,
-    emissive: 0x00aa88,
-    emissiveIntensity: 0.6,
-    roughness: 0.2,
-    metalness: 0.5,
+    color: colorSet.color,
+    emissive: colorSet.emissive,
+    emissiveIntensity: 0.8,
+    roughness: 0.1,
+    metalness: 0.6,
     transparent: true,
     opacity: 0,
+    envMapIntensity: 1.5,
   });
   const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+  crystal.scale.y = 1.5; // lebih tinggi
   group.add(crystal);
   
-  // Kristal kecil di sekitar
-  for (let i = 0; i < 4; i++) {
-    const smallGeo = new THREE.OctahedronGeometry(0.5 + Math.random() * 0.3);
+  // Inner glow core
+  const coreGeo = new THREE.OctahedronGeometry(1.2, 0);
+  const coreMat = new THREE.MeshBasicMaterial({
+    color: colorSet.color,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const core = new THREE.Mesh(coreGeo, coreMat);
+  core.scale.y = 1.5;
+  group.add(core);
+  
+  // Kristal kecil di sekitar - orbit
+  const smallCount = 5 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < smallCount; i++) {
+    const smallSize = 0.4 + Math.random() * 0.4;
+    const smallGeo = new THREE.OctahedronGeometry(smallSize, 0);
     const smallMat = new THREE.MeshStandardMaterial({
-      color: 0x00ffaa,
-      emissive: 0x008866,
-      emissiveIntensity: 0.5,
-      roughness: 0.3,
-      metalness: 0.6,
+      color: colorSet.color,
+      emissive: colorSet.emissive,
+      emissiveIntensity: 0.6,
+      roughness: 0.2,
+      metalness: 0.7,
       transparent: true,
       opacity: 0,
     });
     const small = new THREE.Mesh(smallGeo, smallMat);
-    const angle = (i / 4) * Math.PI * 2;
+    small.scale.y = 1.3 + Math.random() * 0.4;
+    
+    const angle = (i / smallCount) * Math.PI * 2;
+    const radius = 2.5 + Math.random() * 1;
     small.position.set(
-      Math.cos(angle) * 2,
-      (Math.random() - 0.5) * 1.5,
-      Math.sin(angle) * 2
+      Math.cos(angle) * radius,
+      (Math.random() - 0.5) * 2,
+      Math.sin(angle) * radius
     );
-    small.rotation.set(Math.random(), Math.random(), Math.random());
+    small.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
     group.add(small);
   }
   
-  // Point light
-  const light = new THREE.PointLight(0x00ffcc, 2, 15);
+  // Energy field glow
+  const fieldGeo = new THREE.SphereGeometry(3, 32, 32);
+  const fieldMat = new THREE.MeshBasicMaterial({
+    color: colorSet.color,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.BackSide,
+  });
+  const field = new THREE.Mesh(fieldGeo, fieldMat);
+  group.add(field);
+  
+  // Point light - lebih terang
+  const light = new THREE.PointLight(colorSet.light, 5, 20);
   group.add(light);
   
   return group;
@@ -607,34 +916,46 @@ function createWreck(): THREE.Group {
   return group;
 }
 
-// ====== MATAHARI - inti bersinar + glow natural ======
+// ====== MATAHARI - ultra realistis dengan corona detail ======
 function createSun(): THREE.Group {
   const group = new THREE.Group();
   
-  // Inti matahari - super terang
-  const sunGeo = new THREE.SphereGeometry(4, 48, 48);
+  // Inti matahari - putih super terang dengan emissive tinggi
+  const sunGeo = new THREE.SphereGeometry(3.5, 64, 64);
   const sunMat = new THREE.MeshBasicMaterial({
     color: 0xffffff,
-    transparent: false,
   });
   const sun = new THREE.Mesh(sunGeo, sunMat);
   group.add(sun);
   
-  // Corona glow - lapisan cahaya yang menyebar natural
-  const corona1Geo = new THREE.SphereGeometry(6, 32, 32);
-  const corona1Mat = new THREE.MeshBasicMaterial({
-    color: 0xffeeaa,
+  // Photosphere - lapisan dalam dengan tekstur
+  const photoGeo = new THREE.SphereGeometry(4.2, 64, 64);
+  const photoMat = new THREE.MeshBasicMaterial({
+    color: 0xffffdd,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const photo = new THREE.Mesh(photoGeo, photoMat);
+  group.add(photo);
+  
+  // Corona inner - panas intens
+  const corona1Geo = new THREE.SphereGeometry(5.5, 48, 48);
+  const corona1Mat = new THREE.MeshBasicMaterial({
+    color: 0xffee88,
+    transparent: true,
+    opacity: 0.5,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   const corona1 = new THREE.Mesh(corona1Geo, corona1Mat);
   group.add(corona1);
   
-  const corona2Geo = new THREE.SphereGeometry(9, 32, 32);
+  // Corona mid - transisi warna
+  const corona2Geo = new THREE.SphereGeometry(7.5, 48, 48);
   const corona2Mat = new THREE.MeshBasicMaterial({
-    color: 0xffcc66,
+    color: 0xffcc44,
     transparent: true,
     opacity: 0.3,
     blending: THREE.AdditiveBlending,
@@ -643,20 +964,37 @@ function createSun(): THREE.Group {
   const corona2 = new THREE.Mesh(corona2Geo, corona2Mat);
   group.add(corona2);
   
-  const corona3Geo = new THREE.SphereGeometry(14, 32, 32);
+  // Corona outer - menyebar luas
+  const corona3Geo = new THREE.SphereGeometry(11, 48, 48);
   const corona3Mat = new THREE.MeshBasicMaterial({
-    color: 0xff9933,
+    color: 0xff9922,
     transparent: true,
-    opacity: 0.12,
+    opacity: 0.18,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   const corona3 = new THREE.Mesh(corona3Geo, corona3Mat);
   group.add(corona3);
   
-  // Point light SANGAT TERANG
-  const sunLight = new THREE.PointLight(0xffeecc, 15, 200);
+  // Corona extreme - sangat luas dan samar
+  const corona4Geo = new THREE.SphereGeometry(16, 48, 48);
+  const corona4Mat = new THREE.MeshBasicMaterial({
+    color: 0xff6600,
+    transparent: true,
+    opacity: 0.08,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const corona4 = new THREE.Mesh(corona4Geo, corona4Mat);
+  group.add(corona4);
+  
+  // Point light ULTRA TERANG untuk bloom effect
+  const sunLight = new THREE.PointLight(0xffeedd, 20, 250, 2);
   group.add(sunLight);
+  
+  // Secondary light untuk fill
+  const fillLight = new THREE.PointLight(0xffaa44, 8, 180, 2);
+  group.add(fillLight);
   
   return group;
 }
@@ -699,41 +1037,66 @@ export default function SpaceEnvironment() {
     const container = containerRef.current;
 
     // ====== RENDERER ======
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      powerPreference: "high-performance"
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 1.2;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
     // ====== SCENE ======
     const scene = new THREE.Scene();
-    // Background tidak pure black - ada warm tint dari cahaya matahari
-    scene.background = new THREE.Color(0x0a0808);
-    // Fog dengan warm tint agar terlihat cahaya matahari dari kejauhan
-    scene.fog = new THREE.FogExp2(0x1a1008, 0.025);
+    // Background deep space dengan subtle warm tint dari matahari
+    scene.background = new THREE.Color(0x080606);
+    // Fog volumetric dengan warm tint - cahaya matahari menyebar
+    scene.fog = new THREE.FogExp2(0x15100a, 0.022);
 
     // ====== CAMERA ======
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 300);
     camera.position.set(0, 0, 0);
 
-    // ====== LIGHTING ======
-    // Ambient light lebih terang - cahaya matahari menyebar ke seluruh scene
-    scene.add(new THREE.AmbientLight(0x443322, 0.8));
+    // ====== POST-PROCESSING - Bloom untuk efek cahaya realistis ======
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    
+    // Unreal Bloom - efek glow natural seperti mata manusia
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.8,  // strength - intensitas bloom
+      0.4,  // radius - sebaran bloom
+      0.85  // threshold - ambang batas brightness
+    );
+    composer.addPass(bloomPass);
+
+    // ====== LIGHTING - ultra realistis ======
+    // Ambient light - cahaya matahari menyebar ke seluruh scene
+    const ambientLight = new THREE.AmbientLight(0x554433, 0.9);
+    scene.add(ambientLight);
     
     // Cahaya utama dari matahari (akan di-update posisinya)
-    const mainLight = new THREE.DirectionalLight(0xffdd88, 2.0);
+    const mainLight = new THREE.DirectionalLight(0xffeebb, 2.5);
     mainLight.position.set(0, 3, -35);
+    mainLight.castShadow = false;
     scene.add(mainLight);
     
-    // Fill light dari matahari (secondary bounce)
-    const fillLight = new THREE.DirectionalLight(0xffaa66, 0.6);
+    // Fill light dari matahari (secondary bounce) - lebih warm
+    const fillLight = new THREE.DirectionalLight(0xffbb77, 0.8);
     fillLight.position.set(-30, -10, 30);
     scene.add(fillLight);
     
-    // Hemisphere light untuk ambient sky/ground
-    const hemiLight = new THREE.HemisphereLight(0xffddaa, 0x222244, 0.4);
+    // Hemisphere light untuk ambient sky/ground - lebih natural
+    const hemiLight = new THREE.HemisphereLight(0xffddbb, 0x223344, 0.5);
     scene.add(hemiLight);
+    
+    // Rim light untuk edge highlighting
+    const rimLight = new THREE.DirectionalLight(0xaabbff, 0.3);
+    rimLight.position.set(20, 15, -40);
+    scene.add(rimLight);
 
     // ====== MATAHARI - di depan kamera ======
     const sun = createSun();
@@ -745,31 +1108,65 @@ export default function SpaceEnvironment() {
     const SUN_OFFSET = new THREE.Vector3(0, 5, -50);
     const SUN_SAFE_RADIUS = 18; // radius aman dari matahari
 
-    // ====== BINTANG BACKGROUND ======
-    const starCount = 1200;
+    // ====== BINTANG BACKGROUND - realistis dengan variasi ukuran dan warna ======
+    const starCount = 2000;
     const starPos = new Float32Array(starCount * 3);
     const starCol = new Float32Array(starCount * 3);
+    const starSizes = new Float32Array(starCount);
+    
     for (let i = 0; i < starCount; i++) {
-      const r = 80 + Math.random() * 150;
+      const r = 80 + Math.random() * 180;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       starPos[i * 3 + 2] = r * Math.cos(phi);
-      const t = Math.random();
-      if (t > 0.8) { starCol[i*3]=0.7; starCol[i*3+1]=0.8; starCol[i*3+2]=1.0; }
-      else if (t > 0.6) { starCol[i*3]=1.0; starCol[i*3+1]=0.95; starCol[i*3+2]=0.7; }
-      else { starCol[i*3]=1; starCol[i*3+1]=1; starCol[i*3+2]=1; }
+      
+      // Warna bintang berdasarkan suhu (spektrum O-B-A-F-G-K-M)
+      const temp = Math.random();
+      if (temp > 0.92) { 
+        // O/B type - biru panas
+        starCol[i*3]=0.6; starCol[i*3+1]=0.75; starCol[i*3+2]=1.0; 
+      } else if (temp > 0.8) { 
+        // A/F type - putih kebiruan
+        starCol[i*3]=0.85; starCol[i*3+1]=0.9; starCol[i*3+2]=1.0; 
+      } else if (temp > 0.65) { 
+        // G type - putih kekuningan (seperti matahari)
+        starCol[i*3]=1.0; starCol[i*3+1]=0.98; starCol[i*3+2]=0.85; 
+      } else if (temp > 0.45) { 
+        // K type - oranye
+        starCol[i*3]=1.0; starCol[i*3+1]=0.85; starCol[i*3+2]=0.6; 
+      } else { 
+        // M type - merah
+        starCol[i*3]=1.0; starCol[i*3+1]=0.7; starCol[i*3+2]=0.5; 
+      }
+      
+      // Ukuran bervariasi - kebanyakan kecil, beberapa besar
+      const sizeRand = Math.random();
+      if (sizeRand > 0.98) {
+        starSizes[i] = 1.2 + Math.random() * 0.8; // bintang sangat terang
+      } else if (sizeRand > 0.9) {
+        starSizes[i] = 0.7 + Math.random() * 0.5; // bintang terang
+      } else if (sizeRand > 0.6) {
+        starSizes[i] = 0.4 + Math.random() * 0.3; // bintang sedang
+      } else {
+        starSizes[i] = 0.2 + Math.random() * 0.2; // bintang redup
+      }
     }
+    
     const starGeo = new THREE.BufferGeometry();
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
     starGeo.setAttribute('color', new THREE.BufferAttribute(starCol, 3));
+    starGeo.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+    
     const starMat = new THREE.PointsMaterial({
-      size: 0.35,
+      size: 0.5,
       vertexColors: true,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.85,
       sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
     });
     const stars = new THREE.Points(starGeo, starMat);
     scene.add(stars);
@@ -962,6 +1359,8 @@ export default function SpaceEnvironment() {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      composer.setSize(window.innerWidth, window.innerHeight);
+      bloomPass.resolution.set(window.innerWidth, window.innerHeight);
     };
     window.addEventListener('resize', handleResize);
 
@@ -1077,7 +1476,7 @@ export default function SpaceEnvironment() {
         spawnTimer = 0;
       }
 
-      renderer.render(scene, camera);
+      composer.render();
       requestAnimationFrame(animate);
     };
 
