@@ -1119,14 +1119,17 @@ export default function SpaceEnvironment() {
     const SUN_OFFSET = new THREE.Vector3(0, 8, -80); // matahari jauh di depan
     const SUN_SAFE_RADIUS = 18; // radius aman dari matahari
 
-    // ====== VOLUMETRIC FOG PARTICLES - kabut gray di belakang matahari ======
-    // Matahari di (0, 8, -80), kabut di belakangnya (z = -90 sampai -150)
-    const FOG_CENTER_Z = -110; // tengah kabut di belakang matahari
+    // ====== VOLUMETRIC FOG PARTICLES - kabut gray SELALU di belakang matahari ======
+    // Kabut RELATIF terhadap kamera, tapi selalu di belakang matahari
+    // Matahari: offset (0, 8, -80) dari kamera
+    // Kabut: offset (0, 8, -110) dari kamera (30 unit di belakang matahari)
+    
+    const FOG_OFFSET = new THREE.Vector3(0, 8, -110); // posisi kabut relatif terhadap kamera
     const FOG_SPREAD_X = 120;  // penyebaran horizontal (2x lipat)
     const FOG_SPREAD_Y = 80;   // penyebaran vertikal (2x lipat)
     const FOG_SPREAD_Z = 40;   // penyebaran depth
     
-    // Simpan original positions untuk animasi
+    // Simpan original positions untuk animasi (relatif terhadap center kabut)
     const fogOriginalPositions = {
       near: new Float32Array(800 * 3),
       mid: new Float32Array(1000 * 3),
@@ -1139,10 +1142,10 @@ export default function SpaceEnvironment() {
     const fogNearColors = new Float32Array(fogNearCount * 3);
     
     for (let i = 0; i < fogNearCount; i++) {
-      // Posisi di belakang matahari
+      // Posisi RELATIF terhadap center kabut
       const x = (Math.random() - 0.5) * FOG_SPREAD_X;
-      const y = (Math.random() - 0.5) * FOG_SPREAD_Y + 8; // +8 untuk match matahari height
-      const z = FOG_CENTER_Z + (Math.random() - 0.5) * FOG_SPREAD_Z * 0.6;
+      const y = (Math.random() - 0.5) * FOG_SPREAD_Y;
+      const z = (Math.random() - 0.5) * FOG_SPREAD_Z * 0.6;
       
       fogNearPositions[i * 3] = x;
       fogNearPositions[i * 3 + 1] = y;
@@ -1181,10 +1184,10 @@ export default function SpaceEnvironment() {
     const fogMidColors = new Float32Array(fogMidCount * 3);
     
     for (let i = 0; i < fogMidCount; i++) {
-      // Posisi di belakang matahari, lebih jauh
+      // Posisi RELATIF terhadap center kabut, lebih jauh
       const x = (Math.random() - 0.5) * FOG_SPREAD_X * 1.3;
-      const y = (Math.random() - 0.5) * FOG_SPREAD_Y * 1.2 + 8;
-      const z = FOG_CENTER_Z - 20 + (Math.random() - 0.5) * FOG_SPREAD_Z * 0.8;
+      const y = (Math.random() - 0.5) * FOG_SPREAD_Y * 1.2;
+      const z = -20 + (Math.random() - 0.5) * FOG_SPREAD_Z * 0.8;
       
       fogMidPositions[i * 3] = x;
       fogMidPositions[i * 3 + 1] = y;
@@ -1223,10 +1226,10 @@ export default function SpaceEnvironment() {
     const fogFarColors = new Float32Array(fogFarCount * 3);
     
     for (let i = 0; i < fogFarCount; i++) {
-      // Posisi paling jauh di belakang matahari
+      // Posisi RELATIF terhadap center kabut, paling jauh
       const x = (Math.random() - 0.5) * FOG_SPREAD_X * 1.6;
-      const y = (Math.random() - 0.5) * FOG_SPREAD_Y * 1.4 + 8;
-      const z = FOG_CENTER_Z - 40 + (Math.random() - 0.5) * FOG_SPREAD_Z;
+      const y = (Math.random() - 0.5) * FOG_SPREAD_Y * 1.4;
+      const z = -40 + (Math.random() - 0.5) * FOG_SPREAD_Z;
       
       fogFarPositions[i * 3] = x;
       fogFarPositions[i * 3 + 1] = y;
@@ -1358,12 +1361,18 @@ export default function SpaceEnvironment() {
 
       for (let attempt = 0; attempt < 20; attempt++) {
         // SPAWN DARI KABUT DI BELAKANG MATAHARI
-        // Kabut di sekitar z = -90 sampai -150, y = -12 sampai 28, x = -60 sampai 60
-        const spawnX = (Math.random() - 0.5) * 100; // -50 sampai 50
-        const spawnY = (Math.random() - 0.5) * 50 + 8; // -17 sampai 33 (center di y=8)
-        const spawnZ = -90 - Math.random() * 60; // -90 sampai -150
+        // Kabut RELATIF terhadap kamera di offset (0, 8, -110)
+        // Spawn di area kabut: x = -60 sampai 60, y = -32 sampai 48, z = -90 sampai -150
+        
+        // Posisi relatif terhadap kamera
+        const spawnOffsetX = (Math.random() - 0.5) * 120; // -60 sampai 60
+        const spawnOffsetY = (Math.random() - 0.5) * 80 + 8; // -32 sampai 48 (center di y=8)
+        const spawnOffsetZ = -90 - Math.random() * 60; // -90 sampai -150 (di belakang matahari)
 
-        spawnPos = new THREE.Vector3(spawnX, spawnY, spawnZ);
+        // Konversi ke world space
+        const spawnOffset = new THREE.Vector3(spawnOffsetX, spawnOffsetY, spawnOffsetZ);
+        const spawnWorldOffset = spawnOffset.applyQuaternion(camera.quaternion);
+        spawnPos = camera.position.clone().add(spawnWorldOffset);
 
         if (isPositionSafe(spawnPos, radius)) {
           placed = true;
@@ -1393,12 +1402,16 @@ export default function SpaceEnvironment() {
       );
       
       // Drift velocity - bergerak dari kabut menuju kamera
-      // Z positif = bergerak ke arah kamera (dari belakang ke depan)
-      const driftVel = new THREE.Vector3(
+      // Kecepatan relatif terhadap orientasi kamera
+      const driftSpeed = 1.2 + Math.random() * 0.8;
+      const driftLocal = new THREE.Vector3(
         (Math.random() - 0.5) * 0.6,  // sedikit ke samping
         (Math.random() - 0.5) * 0.3,  // sedikit ke atas/bawah
-        1.2 + Math.random() * 0.8     // bergerak ke depan (ke arah kamera)
+        driftSpeed                     // bergerak ke depan (ke arah kamera)
       );
+      
+      // Konversi ke world space berdasarkan orientasi kamera
+      const driftVel = driftLocal.applyQuaternion(camera.quaternion);
 
       objects.push({ mesh, type, radius, rotSpeed, driftVel, age: 0, baseOpacity });
       return true;
@@ -1484,26 +1497,36 @@ export default function SpaceEnvironment() {
         camera.position.add(cameraVelocity.clone().multiplyScalar(delta));
       }
 
-      // ====== ANIMASI KABUT - bergerak di tempat (turbulence) ======
+      // ====== UPDATE KABUT - selalu di belakang matahari ======
+      // Kabut mengikuti kamera dengan offset tetap (selalu di belakang matahari)
+      const fogWorldOffset = FOG_OFFSET.clone().applyQuaternion(camera.quaternion);
+      const fogCenterPos = camera.position.clone().add(fogWorldOffset);
+      
       const fogTime = elapsed * 0.3; // kecepatan pergerakan kabut
       
-      // Animate fog near layer
+      // Update fog near layer - posisi absolut + animasi lokal
       const fogNearPos = fogNearParticles.geometry.attributes.position;
       for (let i = 0; i < fogNearPos.count; i++) {
         const origX = fogOriginalPositions.near[i * 3];
         const origY = fogOriginalPositions.near[i * 3 + 1];
         const origZ = fogOriginalPositions.near[i * 3 + 2];
         
-        // Pergerakan noise di tempat
+        // Pergerakan noise di tempat (relatif terhadap center)
         const offsetX = Math.sin(fogTime + i * 0.1) * 2;
         const offsetY = Math.cos(fogTime * 0.7 + i * 0.15) * 1.5;
         const offsetZ = Math.sin(fogTime * 0.5 + i * 0.2) * 1;
         
-        fogNearPos.setXYZ(i, origX + offsetX, origY + offsetY, origZ + offsetZ);
+        // Posisi absolut = center + offset relatif + animasi lokal
+        fogNearPos.setXYZ(
+          i,
+          fogCenterPos.x + origX + offsetX,
+          fogCenterPos.y + origY + offsetY,
+          fogCenterPos.z + origZ + offsetZ
+        );
       }
       fogNearPos.needsUpdate = true;
       
-      // Animate fog mid layer
+      // Update fog mid layer
       const fogMidPos = fogMidParticles.geometry.attributes.position;
       for (let i = 0; i < fogMidPos.count; i++) {
         const origX = fogOriginalPositions.mid[i * 3];
@@ -1514,11 +1537,16 @@ export default function SpaceEnvironment() {
         const offsetY = Math.cos(fogTime * 0.6 + i * 0.18) * 2;
         const offsetZ = Math.sin(fogTime * 0.4 + i * 0.25) * 1.5;
         
-        fogMidPos.setXYZ(i, origX + offsetX, origY + offsetY, origZ + offsetZ);
+        fogMidPos.setXYZ(
+          i,
+          fogCenterPos.x + origX + offsetX,
+          fogCenterPos.y + origY + offsetY,
+          fogCenterPos.z + origZ + offsetZ
+        );
       }
       fogMidPos.needsUpdate = true;
       
-      // Animate fog far layer
+      // Update fog far layer
       const fogFarPos = fogFarParticles.geometry.attributes.position;
       for (let i = 0; i < fogFarPos.count; i++) {
         const origX = fogOriginalPositions.far[i * 3];
@@ -1529,7 +1557,12 @@ export default function SpaceEnvironment() {
         const offsetY = Math.cos(fogTime * 0.5 + i * 0.2) * 2.5;
         const offsetZ = Math.sin(fogTime * 0.3 + i * 0.3) * 2;
         
-        fogFarPos.setXYZ(i, origX + offsetX, origY + offsetY, origZ + offsetZ);
+        fogFarPos.setXYZ(
+          i,
+          fogCenterPos.x + origX + offsetX,
+          fogCenterPos.y + origY + offsetY,
+          fogCenterPos.z + origZ + offsetZ
+        );
       }
       fogFarPos.needsUpdate = true;
 
