@@ -1167,10 +1167,10 @@ export default function SpaceEnvironment() {
     fogNearGeo.setAttribute('color', new THREE.BufferAttribute(fogNearColors, 3));
     
     const fogNearMat = new THREE.PointsMaterial({
-      size: 20,
+      size: 60, // 3x lebih besar untuk coverage lebih baik
       vertexColors: true,
       transparent: true,
-      opacity: 0.24,
+      opacity: 0.72, // 3x lebih tebal (0.24 * 3)
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1209,10 +1209,10 @@ export default function SpaceEnvironment() {
     fogMidGeo.setAttribute('color', new THREE.BufferAttribute(fogMidColors, 3));
     
     const fogMidMat = new THREE.PointsMaterial({
-      size: 15,
+      size: 45, // 3x lebih besar
       vertexColors: true,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.54, // 3x lebih tebal (0.18 * 3)
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1251,10 +1251,10 @@ export default function SpaceEnvironment() {
     fogFarGeo.setAttribute('color', new THREE.BufferAttribute(fogFarColors, 3));
     
     const fogFarMat = new THREE.PointsMaterial({
-      size: 10,
+      size: 30, // 3x lebih besar
       vertexColors: true,
       transparent: true,
-      opacity: 0.15,
+      opacity: 0.45, // 3x lebih tebal (0.15 * 3)
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1504,15 +1504,23 @@ export default function SpaceEnvironment() {
       const fogCenterPos = camera.position.clone().add(fogWorldOffset);
       
       // PENTING: Pastikan kabut SELALU ADA dan TIDAK PERNAH MENGHILANG
-      // Reset opacity ke nilai asli setiap frame untuk memastikan kabut tidak memudar
-      fogNearMat.opacity = 0.24;
-      fogMidMat.opacity = 0.18;
-      fogFarMat.opacity = 0.15;
+      // Reset opacity ke nilai 3x lebih tebal setiap frame
+      fogNearMat.opacity = 0.72;
+      fogMidMat.opacity = 0.54;
+      fogFarMat.opacity = 0.45;
       
       // Pastikan material tidak berubah
       fogNearMat.transparent = true;
       fogMidMat.transparent = true;
       fogFarMat.transparent = true;
+      fogNearMat.size = 60;
+      fogMidMat.size = 45;
+      fogFarMat.size = 30;
+      
+      // Force update material
+      fogNearMat.needsUpdate = true;
+      fogMidMat.needsUpdate = true;
+      fogFarMat.needsUpdate = true;
       
       const fogTime = elapsed * 0.3; // kecepatan pergerakan kabut
       
@@ -1714,11 +1722,22 @@ export default function SpaceEnvironment() {
         }
       }
 
-      // ====== LOOP SPAWN - cepat dan konsisten ======
+      // ====== LOOP SPAWN - dikurangi 30% tapi selalu ada object ======
       spawnTimer += delta;
-      if (objects.length < MAX_OBJECTS && spawnTimer > 0.3) {
+      if (objects.length < MAX_OBJECTS && spawnTimer > 0.39) { // 0.3 * 1.3 = 0.39 (30% lebih lambat)
         spawnObject();
         spawnTimer = 0;
+      }
+      
+      // PENTING: Pastikan SELALU ada object di depan kamera
+      // Jika tidak ada object dalam jarak 50 unit, spawn segera
+      const hasObjectNearby = objects.some(obj => {
+        const dist = camera.position.distanceTo(obj.mesh.position);
+        return dist < 50 && dist > 10; // antara 10-50 unit dari kamera
+      });
+      
+      if (!hasObjectNearby && objects.length < MAX_OBJECTS) {
+        spawnObject();
       }
 
       composer.render();
