@@ -1135,13 +1135,13 @@ export default function SpaceEnvironment() {
     
     // Simpan original positions untuk animasi (relatif terhadap center kabut)
     const fogOriginalPositions = {
-      near: new Float32Array(6000 * 3),
-      mid: new Float32Array(7500 * 3),
-      far: new Float32Array(10000 * 3)
+      near: new Float32Array(1200 * 3),
+      mid: new Float32Array(1500 * 3),
+      far: new Float32Array(2000 * 3)
     };
     
     // Layer 1: Kabut dekat matahari - partikel besar
-    const fogNearCount = 6000;  // 5x lipat untuk efek sangat tebal
+    const fogNearCount = 1200;
     const fogNearPositions = new Float32Array(fogNearCount * 3);
     const fogNearColors = new Float32Array(fogNearCount * 3);
     
@@ -1167,10 +1167,10 @@ export default function SpaceEnvironment() {
     fogNearGeo.setAttribute('color', new THREE.BufferAttribute(fogNearColors, 3));
     
     const fogNearMat = new THREE.PointsMaterial({
-      size: 60,  // sangat besar untuk overlap maksimal
+      size: 20,
       vertexColors: true,
       transparent: true,
-      opacity: 1.0,  // max opacity
+      opacity: 0.24,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1183,7 +1183,7 @@ export default function SpaceEnvironment() {
     fogOriginalPositions.near.set(fogNearPositions);
     
     // Layer 2: Kabut menengah - partikel sedang
-    const fogMidCount = 7500;  // 5x lipat untuk efek sangat tebal
+    const fogMidCount = 1500;
     const fogMidPositions = new Float32Array(fogMidCount * 3);
     const fogMidColors = new Float32Array(fogMidCount * 3);
     
@@ -1209,10 +1209,10 @@ export default function SpaceEnvironment() {
     fogMidGeo.setAttribute('color', new THREE.BufferAttribute(fogMidColors, 3));
     
     const fogMidMat = new THREE.PointsMaterial({
-      size: 45,  // sangat besar untuk overlap maksimal
+      size: 15,
       vertexColors: true,
       transparent: true,
-      opacity: 1.0,  // max opacity
+      opacity: 0.18,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1225,7 +1225,7 @@ export default function SpaceEnvironment() {
     fogOriginalPositions.mid.set(fogMidPositions);
     
     // Layer 3: Kabut jauh - partikel kecil
-    const fogFarCount = 10000;  // 5x lipat untuk efek sangat tebal
+    const fogFarCount = 2000;
     const fogFarPositions = new Float32Array(fogFarCount * 3);
     const fogFarColors = new Float32Array(fogFarCount * 3);
     
@@ -1251,10 +1251,10 @@ export default function SpaceEnvironment() {
     fogFarGeo.setAttribute('color', new THREE.BufferAttribute(fogFarColors, 3));
     
     const fogFarMat = new THREE.PointsMaterial({
-      size: 35,  // sangat besar untuk overlap maksimal
+      size: 10,
       vertexColors: true,
       transparent: true,
-      opacity: 1.0,  // max opacity
+      opacity: 0.15,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1504,10 +1504,10 @@ export default function SpaceEnvironment() {
       const fogCenterPos = camera.position.clone().add(fogWorldOffset);
       
       // PENTING: Pastikan kabut SELALU ADA dan TIDAK PERNAH MENGHILANG
-      // Reset opacity ke 1.0 setiap frame untuk memastikan kabut tidak memudar
-      fogNearMat.opacity = 1.0;
-      fogMidMat.opacity = 1.0;
-      fogFarMat.opacity = 1.0;
+      // Reset opacity ke nilai asli setiap frame untuk memastikan kabut tidak memudar
+      fogNearMat.opacity = 0.24;
+      fogMidMat.opacity = 0.18;
+      fogFarMat.opacity = 0.15;
       
       // Pastikan material tidak berubah
       fogNearMat.transparent = true;
