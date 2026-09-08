@@ -1126,9 +1126,9 @@ export default function SpaceEnvironment() {
     // ====== VOLUMETRIC FOG PARTICLES - kabut gray SELALU di belakang matahari ======
     // Kabut RELATIF terhadap kamera, tapi selalu di belakang matahari
     // Matahari: offset (0, 8, -80) dari kamera
-    // Kabut: offset (0, 8, -50) dari kamera (30 unit di belakang matahari)
+    // Kabut: offset (0, 8, -130) dari kamera (50 unit DI BELAKANG matahari)
     
-    const FOG_OFFSET = new THREE.Vector3(0, 8, -50); // posisi kabut relatif terhadap kamera
+    const FOG_OFFSET = new THREE.Vector3(0, 8, -130); // 50 unit di belakang matahari
     const FOG_SPREAD_X = 374;  // penyebaran horizontal
     const FOG_SPREAD_Y = 250;  // penyebaran vertikal
     const FOG_SPREAD_Z = 120;  // penyebaran depth
@@ -1155,8 +1155,8 @@ export default function SpaceEnvironment() {
       fogNearPositions[i * 3 + 1] = y;
       fogNearPositions[i * 3 + 2] = z;
       
-      // Warna GRAY
-      const brightness = 0.3 + Math.random() * 0.15;
+      // Warna GRAY GELAP
+      const brightness = 0.15 + Math.random() * 0.08;
       fogNearColors[i * 3] = brightness;
       fogNearColors[i * 3 + 1] = brightness;
       fogNearColors[i * 3 + 2] = brightness;
@@ -1169,7 +1169,7 @@ export default function SpaceEnvironment() {
     // Custom shader material untuk kabut yang TIDAK BISA DIUBAH oleh three.js
     const fogNearMat = new THREE.ShaderMaterial({
       uniforms: {
-        opacity: { value: 0.72 },
+        opacity: { value: 0.35 },
         size: { value: 60.0 }
       },
       vertexShader: `
@@ -1219,8 +1219,8 @@ export default function SpaceEnvironment() {
       fogMidPositions[i * 3 + 1] = y;
       fogMidPositions[i * 3 + 2] = z;
       
-      // Warna GRAY lebih gelap
-      const brightness = 0.25 + Math.random() * 0.12;
+      // Warna GRAY GELAP
+      const brightness = 0.12 + Math.random() * 0.06;
       fogMidColors[i * 3] = brightness;
       fogMidColors[i * 3 + 1] = brightness;
       fogMidColors[i * 3 + 2] = brightness;
@@ -1233,7 +1233,7 @@ export default function SpaceEnvironment() {
     // Custom shader material untuk kabut yang TIDAK BISA DIUBAH oleh three.js
     const fogMidMat = new THREE.ShaderMaterial({
       uniforms: {
-        opacity: { value: 0.54 },
+        opacity: { value: 0.25 },
         size: { value: 45.0 }
       },
       vertexShader: `
@@ -1283,8 +1283,8 @@ export default function SpaceEnvironment() {
       fogFarPositions[i * 3 + 1] = y;
       fogFarPositions[i * 3 + 2] = z;
       
-      // Warna GRAY paling gelap
-      const brightness = 0.2 + Math.random() * 0.1;
+      // Warna GRAY GELAP
+      const brightness = 0.1 + Math.random() * 0.05;
       fogFarColors[i * 3] = brightness;
       fogFarColors[i * 3 + 1] = brightness;
       fogFarColors[i * 3 + 2] = brightness;
@@ -1297,7 +1297,7 @@ export default function SpaceEnvironment() {
     // Custom shader material untuk kabut yang TIDAK BISA DIUBAH oleh three.js
     const fogFarMat = new THREE.ShaderMaterial({
       uniforms: {
-        opacity: { value: 0.45 },
+        opacity: { value: 0.18 },
         size: { value: 30.0 }
       },
       vertexShader: `
@@ -1638,13 +1638,13 @@ export default function SpaceEnvironment() {
       
       // PENTING: Reset material properties SETELAH update posisi partikel
       // Menggunakan ShaderMaterial yang TIDAK BISA DIUBAH oleh three.js
-      fogNearMat.uniforms.opacity.value = 0.72;
+      fogNearMat.uniforms.opacity.value = 0.35;
       fogNearMat.uniforms.size.value = 60.0;
       
-      fogMidMat.uniforms.opacity.value = 0.54;
+      fogMidMat.uniforms.opacity.value = 0.25;
       fogMidMat.uniforms.size.value = 45.0;
       
-      fogFarMat.uniforms.opacity.value = 0.45;
+      fogFarMat.uniforms.opacity.value = 0.18;
       fogFarMat.uniforms.size.value = 30.0;
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
