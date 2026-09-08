@@ -1126,12 +1126,12 @@ export default function SpaceEnvironment() {
     // ====== VOLUMETRIC FOG PARTICLES - kabut gray SELALU di belakang matahari ======
     // Kabut RELATIF terhadap kamera, tapi selalu di belakang matahari
     // Matahari: offset (0, 8, -80) dari kamera
-    // Kabut: offset (0, 8, -110) dari kamera (30 unit di belakang matahari)
+    // Kabut: offset (0, 8, -160) dari kamera (80 unit di belakang matahari)
     
-    const FOG_OFFSET = new THREE.Vector3(0, 8, -110); // posisi kabut relatif terhadap kamera
-    const FOG_SPREAD_X = 312;  // penyebaran horizontal (2x lipat)
-    const FOG_SPREAD_Y = 208;  // penyebaran vertikal (2x lipat)
-    const FOG_SPREAD_Z = 100;  // penyebaran depth (2x lipat)
+    const FOG_OFFSET = new THREE.Vector3(0, 8, -160); // posisi kabut relatif terhadap kamera (mundur 50 unit)
+    const FOG_SPREAD_X = 374;  // penyebaran horizontal (20% lebih besar dari 312)
+    const FOG_SPREAD_Y = 250;  // penyebaran vertikal (20% lebih besar dari 208)
+    const FOG_SPREAD_Z = 120;  // penyebaran depth (20% lebih besar dari 100)
     
     // Simpan original positions untuk animasi (relatif terhadap center kabut)
     const fogOriginalPositions = {
@@ -1504,24 +1504,7 @@ export default function SpaceEnvironment() {
       const fogCenterPos = camera.position.clone().add(fogWorldOffset);
       
       // PENTING: Pastikan kabut SELALU ADA dan TIDAK PERNAH MENGHILANG
-      // Reset opacity ke nilai 3x lebih tebal setiap frame
-      fogNearMat.opacity = 0.72;
-      fogMidMat.opacity = 0.54;
-      fogFarMat.opacity = 0.45;
-      
-      // Pastikan material tidak berubah
-      fogNearMat.transparent = true;
-      fogMidMat.transparent = true;
-      fogFarMat.transparent = true;
-      fogNearMat.size = 60;
-      fogMidMat.size = 45;
-      fogFarMat.size = 30;
-      
-      // Force update material
-      fogNearMat.needsUpdate = true;
-      fogMidMat.needsUpdate = true;
-      fogFarMat.needsUpdate = true;
-      
+      // Reset material properties SETELAH update posisi partikel
       const fogTime = elapsed * 0.3; // kecepatan pergerakan kabut
       
       // Update fog near layer - posisi absolut + animasi lokal
@@ -1585,6 +1568,22 @@ export default function SpaceEnvironment() {
         );
       }
       fogFarPos.needsUpdate = true;
+      
+      // PENTING: Reset material properties SETELAH update posisi partikel
+      fogNearMat.opacity = 0.72;
+      fogNearMat.size = 60;
+      fogNearMat.transparent = true;
+      fogNearMat.needsUpdate = true;
+      
+      fogMidMat.opacity = 0.54;
+      fogMidMat.size = 45;
+      fogMidMat.transparent = true;
+      fogMidMat.needsUpdate = true;
+      
+      fogFarMat.opacity = 0.45;
+      fogFarMat.size = 30;
+      fogFarMat.transparent = true;
+      fogFarMat.needsUpdate = true;
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
       const sunWorldOffset = SUN_OFFSET.clone().applyQuaternion(camera.quaternion);
@@ -1722,9 +1721,11 @@ export default function SpaceEnvironment() {
         }
       }
 
-      // ====== LOOP SPAWN - dikurangi 30% tapi selalu ada object ======
+      // ====== LOOP SPAWN - berurutan tapi random, max 3 detik ======
       spawnTimer += delta;
-      if (objects.length < MAX_OBJECTS && spawnTimer > 0.39) { // 0.3 * 1.3 = 0.39 (30% lebih lambat)
+      
+      // Spawn setiap 3 detik max (berurutan)
+      if (objects.length < MAX_OBJECTS && spawnTimer > 3.0) {
         spawnObject();
         spawnTimer = 0;
       }
@@ -1738,6 +1739,7 @@ export default function SpaceEnvironment() {
       
       if (!hasObjectNearby && objects.length < MAX_OBJECTS) {
         spawnObject();
+        spawnTimer = 0; // reset timer setelah spawn
       }
 
       composer.render();
