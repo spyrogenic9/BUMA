@@ -1,5 +1,3 @@
-@import "tailwindcss";
-
 * {
   margin: 0;
   padding: 0;
@@ -10,67 +8,9 @@ html, body, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #020208;
+  background: #000000;
 }
 
 canvas {
   display: block;
-}
-
-.glass-panel {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-.vignette {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 10;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 50%,
-    rgba(0, 0, 0, 0.4) 80%,
-    rgba(0, 0, 0, 0.8) 100%
-  );
-}
-
-.key {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  font-family: monospace;
-  font-size: 10px;
-  margin: 0 2px;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  margin: 0 auto;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-top-color: rgba(100, 150, 255, 0.6);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Scrollbar hidden */
-::-webkit-scrollbar {
-  display: none;
-}
-
-/* Selection */
-::selection {
-  background: rgba(100, 150, 255, 0.3);
-  color: white;
 }

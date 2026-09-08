@@ -3,7 +3,7 @@ import * as THREE from 'three';
 
 type Mode = 'free' | 'auto';
 
-// Seeded random for reproducibility per chunk
+// Utility: seeded random
 function seededRandom(seed: number) {
   let s = seed;
   return () => {
@@ -12,66 +12,236 @@ function seededRandom(seed: number) {
   };
 }
 
-function createAsteroidGeometry(size: number): THREE.BufferGeometry {
-  const geo = new THREE.IcosahedronGeometry(size, 2);
+// ====== ASTEROID - bentuk tidak beraturan, tekstur batuan ======
+function createAsteroid(size: number): THREE.Mesh {
+  const detail = 2 + Math.floor(Math.random() * 2);
+  const geo = new THREE.IcosahedronGeometry(size, detail);
   const pos = geo.attributes.position;
+  
+  // Displacement acak untuk bentuk tidak beraturan
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
     const z = pos.getZ(i);
-    const noise = 0.6 + Math.random() * 0.8;
-    pos.setXYZ(i, x * noise, y * noise, z * noise);
+    const len = Math.sqrt(x * x + y * y + z * z);
+    const noise = 0.55 + Math.random() * 0.9;
+    const nx = x / len;
+    const ny = y / len;
+    const nz = z / len;
+    pos.setXYZ(i, nx * size * noise, ny * size * noise, nz * size * noise);
   }
   geo.computeVertexNormals();
-  return geo;
-}
 
-function createRockMaterial(): THREE.MeshStandardMaterial {
-  const hue = 0.05 + Math.random() * 0.05;
-  const sat = 0.1 + Math.random() * 0.2;
-  const light = 0.15 + Math.random() * 0.2;
-  return new THREE.MeshStandardMaterial({
-    color: new THREE.Color().setHSL(hue, sat, light),
-    roughness: 0.85 + Math.random() * 0.15,
-    metalness: 0.1 + Math.random() * 0.3,
+  // Warna batuan gelap dengan variasi
+  const gray = 0.08 + Math.random() * 0.12;
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(gray, gray * 0.9, gray * 0.85),
+    roughness: 0.95,
+    metalness: 0.05,
     flatShading: true,
   });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
-function createNebulaParticles(count: number, spread: number): THREE.Points {
+// ====== PLANET - sphere dengan permukaan bervariasi, mungkin cincin ======
+function createPlanet(): THREE.Group {
+  const group = new THREE.Group();
+  const radius = 4 + Math.random() * 10;
+
+  // Body planet
+  const geo = new THREE.SphereGeometry(radius, 48, 48);
+  const pos = geo.attributes.position;
+  
+  // Variasi permukaan halus
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const len = Math.sqrt(x * x + y * y + z * z);
+    const bump = 1 + (Math.random() - 0.5) * 0.02;
+    pos.setXYZ(i, x / len * radius * bump, y / len * radius * bump, z / len * radius * bump);
+  }
+  geo.computeVertexNormals();
+
+  // Warna planet: gas giant atau rocky
+  const isGasGiant = Math.random() > 0.5;
+  let color: THREE.Color;
+  if (isGasGiant) {
+    const hues = [0.05, 0.08, 0.55, 0.6, 0.75]; // orange, brown, blue, purple
+    const hue = hues[Math.floor(Math.random() * hues.length)] + (Math.random() - 0.5) * 0.05;
+    color = new THREE.Color().setHSL(hue, 0.4 + Math.random() * 0.3, 0.25 + Math.random() * 0.2);
+  } else {
+    color = new THREE.Color(0.2 + Math.random() * 0.15, 0.15 + Math.random() * 0.1, 0.1 + Math.random() * 0.1);
+  }
+
+  const mat = new THREE.MeshStandardMaterial({
+    color,
+    roughness: isGasGiant ? 0.6 : 0.85,
+    metalness: 0.05,
+  });
+
+  const planet = new THREE.Mesh(geo, mat);
+  group.add(planet);
+
+  // Cincin (50% kemungkinan)
+  if (Math.random() > 0.5) {
+    const innerRadius = radius * 1.3;
+    const outerRadius = radius * 2.2;
+    const ringGeo = new THREE.RingGeometry(innerRadius, outerRadius, 64);
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(0.4, 0.35, 0.3),
+      roughness: 0.8,
+      metalness: 0.1,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.6,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI * 0.4 + Math.random() * 0.3;
+    ring.rotation.y = Math.random() * Math.PI;
+    group.add(ring);
+  }
+
+  return group;
+}
+
+// ====== NEBULA - awan gas partikel ======
+function createNebula(): THREE.Points {
+  const count = 800 + Math.floor(Math.random() * 600);
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
-  const sizes = new Float32Array(count);
+  const spread = 30 + Math.random() * 40;
 
-  const baseHue = Math.random();
-  const hueRange = 0.15;
+  // Warna nebula: biru/ungu/merah/pink
+  const palette = [
+    [0.6, 0.3, 0.8],  // ungu
+    [0.2, 0.4, 0.9],  // biru
+    [0.9, 0.2, 0.4],  // merah
+    [0.8, 0.3, 0.6],  // pink
+    [0.3, 0.7, 0.9],  // cyan
+  ];
+  const baseColor = palette[Math.floor(Math.random() * palette.length)];
 
   for (let i = 0; i < count; i++) {
-    // Gaussian-like distribution for natural clustering
-    const r = spread * (Math.random() ** 0.5);
+    // Distribusi gaussian untuk bentuk awan natural
+    const r = spread * Math.pow(Math.random(), 0.6);
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
 
     positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.4;
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.3; // pipih
     positions[i * 3 + 2] = r * Math.cos(phi);
 
-    const hue = baseHue + (Math.random() - 0.5) * hueRange;
-    const color = new THREE.Color().setHSL(hue, 0.7 + Math.random() * 0.3, 0.4 + Math.random() * 0.3);
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-
-    sizes[i] = 0.5 + Math.random() * 2.5;
+    // Variasi warna
+    const variation = 0.7 + Math.random() * 0.3;
+    colors[i * 3] = baseColor[0] * variation;
+    colors[i * 3 + 1] = baseColor[1] * variation;
+    colors[i * 3 + 2] = baseColor[2] * variation;
   }
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
   const mat = new THREE.PointsMaterial({
-    size: 1.5,
+    size: 1.5 + Math.random() * 1.5,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.4,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+
+  return new THREE.Points(geo, mat);
+}
+
+// ====== DEBRIS - pecahan kecil logam/puing ======
+function createDebris(): THREE.Group {
+  const group = new THREE.Group();
+  const count = 3 + Math.floor(Math.random() * 5);
+
+  for (let i = 0; i < count; i++) {
+    const size = 0.2 + Math.random() * 0.6;
+    const geoType = Math.floor(Math.random() * 3);
+    let geo: THREE.BufferGeometry;
+
+    if (geoType === 0) {
+      geo = new THREE.BoxGeometry(size, size * 0.5, size * 0.3);
+    } else if (geoType === 1) {
+      geo = new THREE.TetrahedronGeometry(size);
+    } else {
+      geo = new THREE.OctahedronGeometry(size * 0.5);
+    }
+
+    // Warna logam gelap
+    const gray = 0.15 + Math.random() * 0.15;
+    const mat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(gray, gray, gray * 1.1),
+      roughness: 0.4 + Math.random() * 0.3,
+      metalness: 0.7 + Math.random() * 0.3,
+      flatShading: true,
+    });
+
+    const piece = new THREE.Mesh(geo, mat);
+    piece.position.set(
+      (Math.random() - 0.5) * 4,
+      (Math.random() - 0.5) * 4,
+      (Math.random() - 0.5) * 4
+    );
+    piece.rotation.set(
+      Math.random() * Math.PI,
+      Math.random() * Math.PI,
+      Math.random() * Math.PI
+    );
+    group.add(piece);
+  }
+
+  return group;
+}
+
+// ====== KOMAT - inti + ekor partikel ======
+function createComet(): THREE.Group {
+  const group = new THREE.Group();
+
+  // Inti komet
+  const coreGeo = new THREE.SphereGeometry(0.5 + Math.random() * 0.5, 16, 16);
+  const coreMat = new THREE.MeshStandardMaterial({
+    color: 0xccddff,
+    emissive: 0x4466aa,
+    emissiveIntensity: 0.5,
+    roughness: 0.3,
+  });
+  const core = new THREE.Mesh(coreGeo, coreMat);
+  group.add(core);
+
+  // Ekor partikel
+  const tailCount = 200;
+  const positions = new Float32Array(tailCount * 3);
+  const colors = new Float32Array(tailCount * 3);
+
+  for (let i = 0; i < tailCount; i++) {
+    const t = i / tailCount;
+    positions[i * 3] = (Math.random() - 0.5) * 2 * (1 + t * 3);
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 1 * (1 + t * 2);
+    positions[i * 3 + 2] = t * 15 + Math.random() * 3;
+
+    const brightness = 1 - t * 0.7;
+    colors[i * 3] = 0.6 * brightness;
+    colors[i * 3 + 1] = 0.8 * brightness;
+    colors[i * 3 + 2] = 1.0 * brightness;
+  }
+
+  const tailGeo = new THREE.BufferGeometry();
+  tailGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  tailGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const tailMat = new THREE.PointsMaterial({
+    size: 0.5,
     vertexColors: true,
     transparent: true,
     opacity: 0.6,
@@ -80,193 +250,61 @@ function createNebulaParticles(count: number, spread: number): THREE.Points {
     sizeAttenuation: true,
   });
 
-  return new THREE.Points(geo, mat);
+  const tail = new THREE.Points(tailGeo, tailMat);
+  group.add(tail);
+
+  return group;
 }
 
-function createPlanet(): THREE.Group {
+// ====== SPACESHIP WRACK - bangkai kapal ======
+function createWreck(): THREE.Group {
   const group = new THREE.Group();
-  const radius = 3 + Math.random() * 8;
 
-  // Planet body
-  const planetGeo = new THREE.SphereGeometry(radius, 32, 32);
-  const hue = Math.random();
-  const planetMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color().setHSL(hue, 0.3 + Math.random() * 0.4, 0.2 + Math.random() * 0.3),
-    roughness: 0.7,
-    metalness: 0.1,
+  // Badan utama
+  const bodyGeo = new THREE.CylinderGeometry(0.5, 1.5, 6, 8);
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0x333340,
+    roughness: 0.6,
+    metalness: 0.8,
+    flatShading: true,
   });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.rotation.z = Math.random() * Math.PI;
+  group.add(body);
 
-  // Add surface variation
-  const pos = planetGeo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    const z = pos.getZ(i);
-    const len = Math.sqrt(x * x + y * y + z * z);
-    const noise = 1 + (Math.random() - 0.5) * 0.02;
-    pos.setXYZ(i, x / len * radius * noise, y / len * radius * noise, z / len * radius * noise);
-  }
-  planetGeo.computeVertexNormals();
-
-  const planet = new THREE.Mesh(planetGeo, planetMat);
-  group.add(planet);
-
-  // Atmosphere glow
-  const atmosGeo = new THREE.SphereGeometry(radius * 1.15, 32, 32);
-  const atmosMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color().setHSL(hue, 0.8, 0.5),
-    transparent: true,
-    opacity: 0.1,
-    side: THREE.BackSide,
-  });
-  group.add(new THREE.Mesh(atmosGeo, atmosMat));
-
-  // Ring (50% chance)
-  if (Math.random() > 0.5) {
-    const innerR = radius * 1.4;
-    const outerR = radius * 2.2;
-    const ringGeo = new THREE.RingGeometry(innerR, outerR, 64);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color().setHSL(hue + 0.1, 0.3, 0.5),
-      transparent: true,
-      opacity: 0.4,
-      side: THREE.DoubleSide,
+  // Panel rusak
+  for (let i = 0; i < 3; i++) {
+    const panelGeo = new THREE.BoxGeometry(1 + Math.random(), 0.1, 0.5 + Math.random());
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0x222230,
+      roughness: 0.5,
+      metalness: 0.9,
     });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = Math.PI * 0.4 + Math.random() * 0.3;
-    ring.rotation.z = Math.random() * 0.2;
-    group.add(ring);
-  }
-
-  return group;
-}
-
-function createSpaceDebris(): THREE.Group {
-  const group = new THREE.Group();
-  const count = 3 + Math.floor(Math.random() * 8);
-
-  for (let i = 0; i < count; i++) {
-    const size = 0.1 + Math.random() * 0.5;
-    const geo = createAsteroidGeometry(size);
-    const mat = createRockMaterial();
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(
-      (Math.random() - 0.5) * 10,
-      (Math.random() - 0.5) * 10,
-      (Math.random() - 0.5) * 10
+    const panel = new THREE.Mesh(panelGeo, panelMat);
+    panel.position.set(
+      (Math.random() - 0.5) * 3,
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 3
     );
-    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-    group.add(mesh);
+    panel.rotation.set(
+      Math.random() * Math.PI,
+      Math.random() * Math.PI,
+      Math.random() * Math.PI
+    );
+    group.add(panel);
   }
 
   return group;
 }
 
-function createGlowingOrb(): THREE.Group {
-  const group = new THREE.Group();
-  const radius = 0.5 + Math.random() * 1.5;
-  const hue = Math.random();
-
-  const coreGeo = new THREE.SphereGeometry(radius, 16, 16);
-  const coreMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color().setHSL(hue, 1, 0.7),
-  });
-  group.add(new THREE.Mesh(coreGeo, coreMat));
-
-  // Outer glow
-  const glowGeo = new THREE.SphereGeometry(radius * 2, 16, 16);
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color().setHSL(hue, 1, 0.5),
-    transparent: true,
-    opacity: 0.15,
-    side: THREE.BackSide,
-  });
-  group.add(new THREE.Mesh(glowGeo, glowMat));
-
-  // Point light
-  const light = new THREE.PointLight(
-    new THREE.Color().setHSL(hue, 1, 0.5),
-    2,
-    30
-  );
-  group.add(light);
-
-  return group;
-}
-
-function createStarField(count: number, spread: number): THREE.Points {
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-
-  for (let i = 0; i < count; i++) {
-    positions[i * 3] = (Math.random() - 0.5) * spread;
-    positions[i * 3 + 1] = (Math.random() - 0.5) * spread;
-    positions[i * 3 + 2] = (Math.random() - 0.5) * spread;
-
-    const temp = Math.random();
-    let r, g, b;
-    if (temp < 0.3) {
-      // Blue-white stars
-      r = 0.7 + Math.random() * 0.3;
-      g = 0.8 + Math.random() * 0.2;
-      b = 1;
-    } else if (temp < 0.6) {
-      // White stars
-      r = 1;
-      g = 1;
-      b = 0.9 + Math.random() * 0.1;
-    } else if (temp < 0.85) {
-      // Yellow stars
-      r = 1;
-      g = 0.9 + Math.random() * 0.1;
-      b = 0.6 + Math.random() * 0.2;
-    } else {
-      // Red stars
-      r = 1;
-      g = 0.4 + Math.random() * 0.3;
-      b = 0.2 + Math.random() * 0.2;
-    }
-    colors[i * 3] = r;
-    colors[i * 3 + 1] = g;
-    colors[i * 3 + 2] = b;
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-  const mat = new THREE.PointsMaterial({
-    size: 0.3,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.9,
-    sizeAttenuation: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-
-  return new THREE.Points(geo, mat);
-}
-
-interface SpaceObject {
-  mesh: THREE.Object3D;
-  type: string;
-  seed: number;
-  rotationSpeed: THREE.Vector3;
-  fadeStart: number;
-  fadeEnd: number;
-}
-
+// ====== Komponen utama ======
 export default function SpaceEnvironment() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<Mode>('auto');
-  const [isLocked, setIsLocked] = useState(false);
   const [loading, setLoading] = useState(true);
   const modeRef = useRef<Mode>('auto');
   const keysRef = useRef<Set<string>>(new Set());
-  const mouseRef = useRef({ x: 0, y: 0 });
-  const velocityRef = useRef(new THREE.Vector3(0, 0, -0.3));
-  const targetVelocityRef = useRef(new THREE.Vector3(0, 0, -0.3));
+  const mouseRef = useRef({ x: 0, y: 0, locked: false });
 
   useEffect(() => {
     modeRef.current = mode;
@@ -275,472 +313,450 @@ export default function SpaceEnvironment() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Scene setup
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020208);
+    const container = containerRef.current;
 
-    // Dense fog for natural fade-in/out
-    const fogColor = new THREE.Color(0x020208);
-    scene.fog = new THREE.FogExp2(fogColor, 0.008);
-
-    // Camera
-    const camera = new THREE.PerspectiveCamera(
-      70,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
-    camera.position.set(0, 0, 0);
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: false,
-    });
+    // ====== RENDERER ======
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
-    containerRef.current.appendChild(renderer.domElement);
+    renderer.toneMappingExposure = 1.0;
+    container.appendChild(renderer.domElement);
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x111122, 0.5);
+    // ====== SCENE - background hitam pekat ======
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    // ====== FOG SANGAT TEBAL - objek hanya terlihat dekat ======
+    scene.fog = new THREE.FogExp2(0x000000, 0.016);
+
+    // ====== CAMERA ======
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(0, 0, 0);
+
+    // ====== LIGHTING ======
+    // Ambient sangat redup - hanya untuk memberi sedikit cahaya
+    const ambientLight = new THREE.AmbientLight(0x111122, 0.3);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffeedd, 0.8);
-    dirLight.position.set(50, 30, -50);
-    scene.add(dirLight);
+    // Cahaya utama dari "bintang jauh"
+    const mainLight = new THREE.DirectionalLight(0xffeedd, 0.8);
+    mainLight.position.set(50, 30, -50);
+    scene.add(mainLight);
 
-    const dirLight2 = new THREE.DirectionalLight(0x4466aa, 0.3);
-    dirLight2.position.set(-30, -20, 30);
-    scene.add(dirLight2);
+    // Cahaya biru dari sisi lain
+    const fillLight = new THREE.DirectionalLight(0x4466aa, 0.3);
+    fillLight.position.set(-30, -10, 30);
+    scene.add(fillLight);
 
-    // Star layers that follow camera
-    const starLayers: THREE.Points[] = [];
-    for (let i = 0; i < 3; i++) {
-      const spread = 300 + i * 200;
-      const count = 2000 - i * 500;
-      const stars = createStarField(count, spread);
-      scene.add(stars);
-      starLayers.push(stars);
+    // ====== STAR FIELD - bintang-bintang kecil di background ======
+    const starCount = 3000;
+    const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+    const starSizes = new Float32Array(starCount);
+
+    for (let i = 0; i < starCount; i++) {
+      const r = 100 + Math.random() * 300;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      starPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      starPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      starPositions[i * 3 + 2] = r * Math.cos(phi);
+
+      // Warna bintang: putih, biru, kuning
+      const temp = Math.random();
+      if (temp > 0.8) {
+        starColors[i * 3] = 0.8; starColors[i * 3 + 1] = 0.9; starColors[i * 3 + 2] = 1.0;
+      } else if (temp > 0.6) {
+        starColors[i * 3] = 1.0; starColors[i * 3 + 1] = 0.95; starColors[i * 3 + 2] = 0.7;
+      } else {
+        starColors[i * 3] = 1.0; starColors[i * 3 + 1] = 1.0; starColors[i * 3 + 2] = 1.0;
+      }
+      starSizes[i] = 0.3 + Math.random() * 0.8;
     }
 
-    // Space objects management
-    const spaceObjects: SpaceObject[] = [];
-    const SPAWN_RADIUS = 150;
-    const DESPAWN_RADIUS = 180;
-    const FADE_START = 80;
-    const FADE_END = 150;
-    let chunkSeed = 12345;
-    let lastSpawnZ = 0;
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+    const starMat = new THREE.PointsMaterial({
+      size: 0.5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      sizeAttenuation: true,
+    });
+    const stars = new THREE.Points(starGeo, starMat);
+    scene.add(stars);
 
-    function spawnObject(forward: boolean) {
-      const rng = seededRandom(chunkSeed++);
-      const typeRoll = rng();
+    // ====== OBJECTS POOL - objek luar angkasa ======
+    interface SpaceObject {
+      mesh: THREE.Object3D;
+      type: string;
+      velocity: THREE.Vector3;
+      rotSpeed: THREE.Vector3;
+      spawnTime: number;
+    }
 
+    const objects: SpaceObject[] = [];
+    const FADE_DISTANCE = 70; // jarak mulai fade
+    const MAX_DISTANCE = 100; // jarak max sebelum dihapus
+    const SPAWN_DISTANCE_MIN = 40;
+    const SPAWN_DISTANCE_MAX = 90;
+
+    function spawnObject() {
+      const rand = Math.random();
       let mesh: THREE.Object3D;
       let type: string;
 
-      if (typeRoll < 0.35) {
-        // Asteroid cluster
+      if (rand < 0.35) {
+        // Asteroid (35%)
+        const size = 0.5 + Math.random() * 3;
+        mesh = createAsteroid(size);
         type = 'asteroid';
-        const count = 1 + Math.floor(rng() * 5);
-        const group = new THREE.Group();
-        for (let i = 0; i < count; i++) {
-          const size = 0.5 + rng() * 3;
-          const geo = createAsteroidGeometry(size);
-          const mat = createRockMaterial();
-          const m = new THREE.Mesh(geo, mat);
-          m.position.set(
-            (rng() - 0.5) * 15,
-            (rng() - 0.5) * 15,
-            (rng() - 0.5) * 15
-          );
-          m.rotation.set(rng() * Math.PI * 2, rng() * Math.PI * 2, rng() * Math.PI * 2);
-          group.add(m);
-        }
-        mesh = group;
-      } else if (typeRoll < 0.5) {
-        // Nebula
-        type = 'nebula';
-        const count = 200 + Math.floor(rng() * 400);
-        const spread = 15 + rng() * 25;
-        mesh = createNebulaParticles(count, spread);
-      } else if (typeRoll < 0.6) {
-        // Planet
-        type = 'planet';
+      } else if (rand < 0.50) {
+        // Planet (15%)
         mesh = createPlanet();
-      } else if (typeRoll < 0.75) {
-        // Space debris
+        type = 'planet';
+      } else if (rand < 0.65) {
+        // Nebula (15%)
+        mesh = createNebula();
+        type = 'nebula';
+      } else if (rand < 0.80) {
+        // Debris (15%)
+        mesh = createDebris();
         type = 'debris';
-        mesh = createSpaceDebris();
-      } else if (typeRoll < 0.88) {
-        // Glowing orb
-        type = 'orb';
-        mesh = createGlowingOrb();
+      } else if (rand < 0.92) {
+        // Komet (12%)
+        mesh = createComet();
+        type = 'comet';
       } else {
-        // Large asteroid
-        type = 'asteroid';
-        const size = 3 + rng() * 8;
-        const geo = createAsteroidGeometry(size);
-        const mat = createRockMaterial();
-        mesh = new THREE.Mesh(geo, mat);
+        // Wreck (8%)
+        mesh = createWreck();
+        type = 'wreck';
       }
 
-      // Position: spread around but biased forward
-      const angle = rng() * Math.PI * 2;
-      const dist = 30 + rng() * (SPAWN_RADIUS - 30);
-      const zOffset = forward ? (80 + rng() * 70) : (-80 - rng() * 70);
+      // Posisi spawn di sekitar kamera tapi di depan
+      const angle = Math.random() * Math.PI * 2;
+      const distance = SPAWN_DISTANCE_MIN + Math.random() * (SPAWN_DISTANCE_MAX - SPAWN_DISTANCE_MIN);
+      const height = (Math.random() - 0.5) * 60;
 
-      mesh.position.set(
-        Math.cos(angle) * dist * 0.6,
-        (rng() - 0.5) * dist * 0.4,
-        camera.position.z + zOffset
-      );
+      // Spawn di depan kamera
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
 
-      // Random rotation
+      const spawnPos = camera.position.clone()
+        .add(forward.multiplyScalar(distance * 0.7))
+        .add(right.multiplyScalar(Math.cos(angle) * distance * 0.5))
+        .add(up.multiplyScalar(height));
+
+      mesh.position.copy(spawnPos);
+
+      // Rotasi acak
       mesh.rotation.set(
-        rng() * Math.PI * 2,
-        rng() * Math.PI * 2,
-        rng() * Math.PI * 2
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2
       );
-
-      // Start invisible for fade-in
-      mesh.traverse((child) => {
-        if ((child as THREE.Mesh).material) {
-          const mat = (child as THREE.Mesh).material;
-          if (Array.isArray(mat)) {
-            mat.forEach(m => { m.transparent = true; m.opacity = 0; });
-          } else {
-            (mat as THREE.Material & { opacity: number }).transparent = true;
-            (mat as THREE.Material & { opacity: number }).opacity = 0;
-          }
-        }
-      });
 
       scene.add(mesh);
 
+      // Kecepatan rotasi
       const rotSpeed = new THREE.Vector3(
-        (rng() - 0.5) * 0.005,
-        (rng() - 0.5) * 0.005,
-        (rng() - 0.5) * 0.003
+        (Math.random() - 0.5) * 0.01,
+        (Math.random() - 0.5) * 0.01,
+        (Math.random() - 0.5) * 0.01
       );
 
-      spaceObjects.push({
-        mesh,
-        type,
-        seed: chunkSeed - 1,
-        rotationSpeed: rotSpeed,
-        fadeStart: FADE_START,
-        fadeEnd: FADE_END,
-      });
+      // Kecepatan drift (sangat pelan)
+      const velocity = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.02,
+        (Math.random() - 0.5) * 0.01,
+        (Math.random() - 0.5) * 0.02
+      );
+
+      objects.push({ mesh, type, velocity, rotSpeed, spawnTime: Date.now() });
     }
 
-    // Initial spawn
-    for (let i = 0; i < 40; i++) {
-      spawnObject(i % 2 === 0);
+    // Spawn awal
+    for (let i = 0; i < 25; i++) {
+      spawnObject();
     }
 
-    // Euler for camera rotation
-    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-    let pitchAngle = 0;
-    let yawAngle = 0;
+    // ====== KAMERA STATE ======
+    const cameraVelocity = new THREE.Vector3(0, 0, 0);
+    const cameraDirection = new THREE.Euler(0, 0, 0, 'YXZ');
+    let yaw = 0;
+    let pitch = 0;
+    const AUTO_SPEED = 2.5; // kecepatan maju otomatis
 
-    // Animation
-    const clock = new THREE.Clock();
-    let animationId: number;
+    // ====== POINTER LOCK untuk mode bebas ======
+    const handlePointerLockChange = () => {
+      mouseRef.current.locked = document.pointerLockElement === renderer.domElement;
+    };
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
 
-    function animate() {
-      animationId = requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), 0.05);
-      const elapsed = clock.getElapsedTime();
-
-      const currentMode = modeRef.current;
-
-      // Camera movement
-      if (currentMode === 'auto') {
-        // Only move forward slowly
-        targetVelocityRef.current.set(0, 0, -0.8);
-
-        // Very subtle random drift for natural feel
-        const driftX = Math.sin(elapsed * 0.1) * 0.02;
-        const driftY = Math.cos(elapsed * 0.07) * 0.01;
-        euler.y -= driftX * delta;
-        euler.x -= driftY * delta;
-        euler.x = Math.max(-0.1, Math.min(0.1, euler.x));
-      } else {
-        // Free mode - smooth forward movement with mouse look
-        const speed = keysRef.current.has('shift') ? 3 : 1.2;
-        const boost = keysRef.current.has('e') ? 2.5 : 1;
-        const slow = keysRef.current.has('q') ? 0.3 : 1;
-
-        targetVelocityRef.current.set(0, 0, -speed * boost * slow);
-
-        // Mouse look
-        euler.y -= mouseRef.current.x * 0.002;
-        euler.x -= mouseRef.current.y * 0.002;
-        euler.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, euler.x));
-        mouseRef.current.x = 0;
-        mouseRef.current.y = 0;
+    const handleMouseMove = (e: MouseEvent) => {
+      if (mouseRef.current.locked && modeRef.current === 'free') {
+        yaw -= e.movementX * 0.002;
+        pitch -= e.movementY * 0.002;
+        pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
       }
+    };
+    document.addEventListener('mousemove', handleMouseMove);
 
-      // Smooth velocity lerp
-      velocityRef.current.lerp(targetVelocityRef.current, delta * 3);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keysRef.current.add(e.code);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keysRef.current.delete(e.code);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
 
-      // Apply rotation
-      camera.quaternion.setFromEuler(euler);
-
-      // Move camera in local space
-      const moveVec = velocityRef.current.clone().applyQuaternion(camera.quaternion);
-      camera.position.add(moveVec);
-
-      // Update star layers to follow camera
-      starLayers.forEach((layer, i) => {
-        layer.position.copy(camera.position);
-        // Subtle rotation for parallax
-        layer.rotation.y = elapsed * 0.002 * (i + 1);
-        layer.rotation.x = elapsed * 0.001 * (i + 1);
-      });
-
-      // Update space objects
-      const camPos = camera.position;
-
-      for (let i = spaceObjects.length - 1; i >= 0; i--) {
-        const obj = spaceObjects[i];
-        const dist = obj.mesh.position.distanceTo(camPos);
-
-        // Despawn if too far
-        if (dist > DESPAWN_RADIUS) {
-          scene.remove(obj.mesh);
-          // Dispose geometry and materials
-          obj.mesh.traverse((child) => {
-            if ((child as THREE.Mesh).geometry) {
-              (child as THREE.Mesh).geometry.dispose();
-            }
-            if ((child as THREE.Mesh).material) {
-              const mat = (child as THREE.Mesh).material;
-              if (Array.isArray(mat)) mat.forEach(m => m.dispose());
-              else mat.dispose();
-            }
-          });
-          spaceObjects.splice(i, 1);
-          continue;
-        }
-
-        // Smooth fade based on distance
-        let targetOpacity = 1;
-        if (dist > obj.fadeEnd) {
-          targetOpacity = 0;
-        } else if (dist > obj.fadeStart) {
-          const t = (dist - obj.fadeStart) / (obj.fadeEnd - obj.fadeStart);
-          // Smooth easing
-          targetOpacity = 1 - t * t;
-        } else if (dist < 15) {
-          // Also fade if very close (passed through)
-          targetOpacity = dist / 15;
-        }
-
-        // Apply opacity smoothly
-        obj.mesh.traverse((child) => {
-          if ((child as THREE.Mesh).material) {
-            const mat = (child as THREE.Mesh).material;
-            const mats = Array.isArray(mat) ? mat : [mat];
-            mats.forEach(m => {
-              const mAny = m as THREE.Material & { opacity: number };
-              mAny.transparent = true;
-              // Smooth lerp for opacity
-              mAny.opacity += (targetOpacity - mAny.opacity) * delta * 4;
-            });
-          }
-        });
-
-        // Rotation
-        obj.mesh.rotation.x += obj.rotationSpeed.x;
-        obj.mesh.rotation.y += obj.rotationSpeed.y;
-        obj.mesh.rotation.z += obj.rotationSpeed.z;
-
-        // Nebula slow rotation
-        if (obj.type === 'nebula') {
-          obj.mesh.rotation.y += 0.001;
-        }
+    const handleClick = () => {
+      if (modeRef.current === 'free' && !mouseRef.current.locked) {
+        renderer.domElement.requestPointerLock();
       }
+    };
+    renderer.domElement.addEventListener('click', handleClick);
 
-      // Spawn new objects to maintain density
-      while (spaceObjects.length < 35) {
-        spawnObject(Math.random() > 0.3);
-      }
-
-      // Also spawn ahead of camera
-      if (Math.random() < 0.02) {
-        spawnObject(true);
-      }
-
-      renderer.render(scene, camera);
-    }
-
-    // Start
-    setTimeout(() => setLoading(false), 800);
-    animate();
-
-    // Event handlers
+    // ====== RESIZE ======
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (document.pointerLockElement === renderer.domElement) {
-        mouseRef.current.x += e.movementX;
-        mouseRef.current.y += e.movementY;
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      keysRef.current.add(e.key.toLowerCase());
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      keysRef.current.delete(e.key.toLowerCase());
-    };
-
-    const handleClick = () => {
-      if (modeRef.current === 'free') {
-        renderer.domElement.requestPointerLock();
-      }
-    };
-
-    const handlePointerLockChange = () => {
-      setIsLocked(document.pointerLockElement === renderer.domElement);
-    };
-
     window.addEventListener('resize', handleResize);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    renderer.domElement.addEventListener('click', handleClick);
-    document.addEventListener('pointerlockchange', handlePointerLockChange);
 
-    return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      renderer.domElement.removeEventListener('click', handleClick);
-      document.removeEventListener('pointerlockchange', handlePointerLockChange);
+    // ====== ANIMATION LOOP ======
+    const clock = new THREE.Clock();
+    let lastSpawn = 0;
 
-      // Cleanup
-      spaceObjects.forEach(obj => {
-        obj.mesh.traverse((child) => {
-          if ((child as THREE.Mesh).geometry) (child as THREE.Mesh).geometry.dispose();
-          if ((child as THREE.Mesh).material) {
-            const mat = (child as THREE.Mesh).material;
-            if (Array.isArray(mat)) mat.forEach(m => m.dispose());
-            else mat.dispose();
-          }
-        });
-      });
-      starLayers.forEach(s => {
-        s.geometry.dispose();
-        (s.material as THREE.Material).dispose();
-      });
-      renderer.dispose();
-      if (containerRef.current?.contains(renderer.domElement)) {
-        containerRef.current.removeChild(renderer.domElement);
+    const animate = () => {
+      const delta = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
+
+      // ====== UPDATE KAMERA ======
+      if (modeRef.current === 'auto') {
+        // Mode otomatis: maju lurus perlahan, tanpa pergeseran
+        cameraDirection.set(pitch, yaw, 0, 'YXZ');
+        camera.quaternion.setFromEuler(cameraDirection);
+
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        camera.position.add(forward.multiplyScalar(AUTO_SPEED * delta));
+
+        // Bintang mengikuti kamera
+        stars.position.copy(camera.position);
+      } else {
+        // Mode bebas
+        cameraDirection.set(pitch, yaw, 0, 'YXZ');
+        camera.quaternion.setFromEuler(cameraDirection);
+
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        const up = new THREE.Vector3(0, 1, 0);
+
+        const moveSpeed = keysRef.current.has('ShiftLeft') ? 15 : 6;
+        const targetVel = new THREE.Vector3();
+
+        if (keysRef.current.has('KeyW')) targetVel.add(forward);
+        if (keysRef.current.has('KeyS')) targetVel.sub(forward);
+        if (keysRef.current.has('KeyD')) targetVel.add(right);
+        if (keysRef.current.has('KeyA')) targetVel.sub(right);
+        if (keysRef.current.has('Space')) targetVel.add(up);
+        if (keysRef.current.has('ControlLeft')) targetVel.sub(up);
+
+        if (targetVel.length() > 0) targetVel.normalize();
+        targetVel.multiplyScalar(moveSpeed);
+
+        cameraVelocity.lerp(targetVel, 0.1);
+        camera.position.add(cameraVelocity.clone().multiplyScalar(delta));
+
+        stars.position.copy(camera.position);
       }
+
+      // ====== UPDATE OBJEK ======
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const obj = objects[i];
+        const dist = camera.position.distanceTo(obj.mesh.position);
+
+        // Rotasi
+        obj.mesh.rotation.x += obj.rotSpeed.x;
+        obj.mesh.rotation.y += obj.rotSpeed.y;
+        obj.mesh.rotation.z += obj.rotSpeed.z;
+
+        // Drift
+        obj.mesh.position.add(obj.velocity.clone().multiplyScalar(delta));
+
+        // Fade berdasarkan jarak - SMOOTH dari fog
+        if (dist < FADE_DISTANCE) {
+          // Objek dekat: terlihat penuh
+          obj.mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh || child instanceof THREE.Points) {
+              const mat = child.material as THREE.Material;
+              if (mat.transparent !== undefined) {
+                mat.transparent = true;
+                const baseOpacity = obj.type === 'nebula' ? 0.4 : 
+                                   obj.type === 'comet' ? 0.6 : 1.0;
+                mat.opacity = baseOpacity;
+              }
+            }
+          });
+        } else if (dist < MAX_DISTANCE) {
+          // Fade out gradual
+          const fadeProgress = (dist - FADE_DISTANCE) / (MAX_DISTANCE - FADE_DISTANCE);
+          const opacity = 1 - Math.pow(fadeProgress, 1.5); // easing
+          obj.mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh || child instanceof THREE.Points) {
+              const mat = child.material as THREE.Material;
+              mat.transparent = true;
+              const baseOpacity = obj.type === 'nebula' ? 0.4 : 
+                                 obj.type === 'comet' ? 0.6 : 1.0;
+              mat.opacity = baseOpacity * opacity;
+            }
+          });
+        }
+
+        // Hapus jika terlalu jauh
+        if (dist > MAX_DISTANCE) {
+          scene.remove(obj.mesh);
+          obj.mesh.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              child.geometry.dispose();
+              if (Array.isArray(child.material)) {
+                child.material.forEach(m => m.dispose());
+              } else {
+                child.material.dispose();
+              }
+            }
+          });
+          objects.splice(i, 1);
+        }
+      }
+
+      // Spawn objek baru
+      if (objects.length < 30 && elapsed - lastSpawn > 0.5) {
+        spawnObject();
+        lastSpawn = elapsed;
+      }
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    };
+
+    // Loading selesai
+    setTimeout(() => setLoading(false), 800);
+    animate();
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('pointerlockchange', handlePointerLockChange);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+      renderer.domElement.removeEventListener('click', handleClick);
+      window.removeEventListener('resize', handleResize);
+      if (container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
+      }
+      renderer.dispose();
     };
   }, []);
 
   return (
-    <div className="w-full h-screen relative overflow-hidden bg-black">
-      <div ref={containerRef} className="w-full h-full" />
-
-      {/* Vignette overlay */}
-      <div className="vignette" />
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
       {/* Loading screen */}
       {loading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#020208]">
-          <div className="text-center">
-            <div className="spinner mb-6" />
-            <p className="text-white/70 text-lg tracking-widest uppercase">
-              Memuat Lingkungan Luar Angkasa...
-            </p>
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: '#000',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+        }}>
+          <div style={{ color: '#667', fontSize: '18px', fontFamily: 'monospace' }}>
+            Memuat lingkungan luar angkasa...
           </div>
         </div>
       )}
 
-      {/* UI Overlay */}
-      <div className="fixed top-0 left-0 right-0 z-30 pointer-events-none">
-        <div className="flex justify-between items-start p-4 md:p-6">
-          {/* Mode toggle */}
-          <div className="pointer-events-auto">
-            <div className="glass-panel px-4 py-3 rounded-xl">
-              <p className="text-white/50 text-[10px] uppercase tracking-[0.2em] mb-2">Mode Perjalanan</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setMode('auto')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                    mode === 'auto'
-                      ? 'bg-blue-500/30 text-blue-300 border border-blue-400/40 shadow-lg shadow-blue-500/10'
-                      : 'text-white/40 hover:text-white/70 border border-transparent'
-                  }`}
-                >
-                  <span className="mr-1.5">🚀</span>Otomatis
-                </button>
-                <button
-                  onClick={() => setMode('free')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                    mode === 'free'
-                      ? 'bg-purple-500/30 text-purple-300 border border-purple-400/40 shadow-lg shadow-purple-500/10'
-                      : 'text-white/40 hover:text-white/70 border border-transparent'
-                  }`}
-                >
-                  <span className="mr-1.5">🎮</span>Bebas
-                </button>
-              </div>
-            </div>
-          </div>
+      {/* UI Controls */}
+      <div style={{
+        position: 'absolute',
+        top: '20px',
+        left: '20px',
+        zIndex: 10,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+      }}>
+        <button
+          onClick={() => setMode(mode === 'auto' ? 'free' : 'auto')}
+          style={{
+            padding: '10px 20px',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            color: '#ccc',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            backdropFilter: 'blur(10px)',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+          }}
+        >
+          {mode === 'auto' ? '🚀 Mode: Otomatis' : '🎮 Mode: Bebas'}
+        </button>
 
-          {/* Status */}
-          <div className="pointer-events-auto">
-            <div className="glass-panel px-4 py-3 rounded-xl text-right">
-              <p className="text-white/50 text-[10px] uppercase tracking-[0.2em] mb-1">Status</p>
-              <p className="text-white/80 text-sm">
-                {mode === 'auto' ? '🌌 Menjelajah Otomatis' : isLocked ? '🎯 Kontrol Aktif' : '👆 Klik untuk Kontrol'}
-              </p>
-            </div>
-          </div>
+        <div style={{
+          color: '#556',
+          fontSize: '11px',
+          fontFamily: 'monospace',
+          maxWidth: '200px',
+          lineHeight: '1.4',
+        }}>
+          {mode === 'auto' ? (
+            <>Menjelajah otomatis ke depan.<br />Klik tombol untuk mode bebas.</>
+          ) : (
+            <>
+              WASD: Gerak<br />
+              Mouse: Lihat (klik untuk lock)<br />
+              Space/Ctrl: Naik/Turun<br />
+              Shift: Cepat
+            </>
+          )}
         </div>
       </div>
 
-      {/* Controls help */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
-        <div className="flex justify-center p-4 md:p-6">
-          <div className="glass-panel px-5 py-3 rounded-xl">
-            {mode === 'auto' ? (
-              <p className="text-white/50 text-xs text-center tracking-wide">
-                ✨ Menjelajah otomatis melalui ruang angkasa tanpa batas — duduk dan nikmati pemandangannya
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-x-5 gap-y-1 justify-center text-white/50 text-xs">
-                <span><kbd className="key">Mouse</kbd> Lihat sekitar</span>
-                <span><kbd className="key">Shift</kbd> Cepat</span>
-                <span><kbd className="key">E</kbd> Boost</span>
-                <span><kbd className="key">Q</kbd> Lambat</span>
-                <span><kbd className="key">Esc</kbd> Keluar</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Crosshair for free mode */}
-      {mode === 'free' && isLocked && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none">
-          <div className="w-1.5 h-1.5 rounded-full bg-white/40 shadow-lg shadow-white/20" />
-        </div>
+      {/* Crosshair untuk mode bebas */}
+      {mode === 'free' && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '4px',
+          height: '4px',
+          borderRadius: '50%',
+          background: 'rgba(255,255,255,0.3)',
+          pointerEvents: 'none',
+        }} />
       )}
     </div>
   );
