@@ -460,11 +460,14 @@ export default function SpaceEnvironment() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<Mode>('auto');
   const [loading, setLoading] = useState(true);
+  const [sunIntensity, setSunIntensity] = useState(2.0);
   const modeRef = useRef<Mode>('auto');
+  const sunIntensityRef = useRef(2.0);
   const keysRef = useRef<Set<string>>(new Set());
   const mouseRef = useRef({ locked: false });
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { sunIntensityRef.current = sunIntensity; }, [sunIntensity]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -500,6 +503,9 @@ export default function SpaceEnvironment() {
     const sun = createSun();
     sun.position.set(0, 5, -60); // di depan dan sedikit atas
     scene.add(sun);
+    
+    // Simpan referensi sunLight untuk update intensity
+    const sunLight = sun.children.find(child => child instanceof THREE.PointLight) as THREE.PointLight;
 
     // ====== BINTANG BACKGROUND ======
     const starCount = 1200;
@@ -734,6 +740,11 @@ export default function SpaceEnvironment() {
       const sunOffset = new THREE.Vector3(0, 8, -65);
       const sunWorldOffset = sunOffset.clone().applyQuaternion(camera.quaternion);
       sun.position.copy(camera.position).add(sunWorldOffset);
+      
+      // Update intensity matahari dari slider
+      if (sunLight) {
+        sunLight.intensity = sunIntensityRef.current;
+      }
 
       // ====== UPDATE OBJEK ======
       for (let i = objects.length - 1; i >= 0; i--) {
@@ -785,7 +796,7 @@ export default function SpaceEnvironment() {
 
       // ====== LOOP SPAWN ======
       spawnTimer += delta;
-      if (objects.length < MAX_OBJECTS && spawnTimer > 2.0) {
+      if (objects.length < MAX_OBJECTS && spawnTimer > 1.0) {
         spawnObject();
         spawnTimer = 0;
       }
@@ -847,6 +858,39 @@ export default function SpaceEnvironment() {
             ? 'Menjelajah otomatis.'
             : <>WASD: Gerak<br/>Mouse: Lihat (klik)<br/>Space/Ctrl: Naik/Turun<br/>Shift: Cepat</>
           }
+        </div>
+        
+        {/* Sun Intensity Slider */}
+        <div style={{
+          marginTop: '8px',
+          padding: '8px 12px',
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '5px',
+          backdropFilter: 'blur(8px)',
+        }}>
+          <div style={{ color: '#888', fontSize: '10px', fontFamily: 'monospace', marginBottom: '6px' }}>
+            ☀️ Kekuatan Matahari
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="5"
+            step="0.1"
+            value={sunIntensity}
+            onChange={(e) => setSunIntensity(parseFloat(e.target.value))}
+            style={{
+              width: '100%',
+              height: '4px',
+              borderRadius: '2px',
+              background: 'rgba(255,255,255,0.1)',
+              outline: 'none',
+              cursor: 'pointer',
+            }}
+          />
+          <div style={{ color: '#667', fontSize: '9px', fontFamily: 'monospace', marginTop: '4px', textAlign: 'center' }}>
+            {sunIntensity.toFixed(1)}
+          </div>
         </div>
       </div>
 
