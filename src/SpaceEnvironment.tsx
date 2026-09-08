@@ -928,6 +928,55 @@ function createSun(): THREE.Group {
   const sun = new THREE.Mesh(sunGeo, sunMat);
   group.add(sun);
   
+  // ====== GLOW LAYERS - membuat matahari lebih terang ======
+  // Inner glow - kuning terang
+  const glow1Geo = new THREE.SphereGeometry(7, 32, 32);
+  const glow1Mat = new THREE.MeshBasicMaterial({
+    color: 0xffffaa,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const glow1 = new THREE.Mesh(glow1Geo, glow1Mat);
+  group.add(glow1);
+  
+  // Middle glow - kuning
+  const glow2Geo = new THREE.SphereGeometry(8.5, 32, 32);
+  const glow2Mat = new THREE.MeshBasicMaterial({
+    color: 0xffee66,
+    transparent: true,
+    opacity: 0.4,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const glow2 = new THREE.Mesh(glow2Geo, glow2Mat);
+  group.add(glow2);
+  
+  // Outer glow - oranye
+  const glow3Geo = new THREE.SphereGeometry(10.5, 32, 32);
+  const glow3Mat = new THREE.MeshBasicMaterial({
+    color: 0xffcc33,
+    transparent: true,
+    opacity: 0.25,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const glow3 = new THREE.Mesh(glow3Geo, glow3Mat);
+  group.add(glow3);
+  
+  // Corona - sangat luar
+  const coronaGeo = new THREE.SphereGeometry(13, 32, 32);
+  const coronaMat = new THREE.MeshBasicMaterial({
+    color: 0xffaa00,
+    transparent: true,
+    opacity: 0.15,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const corona = new THREE.Mesh(coronaGeo, coronaMat);
+  group.add(corona);
+  
   // ====== SOLAR FLARE PARTICLES - 2x lebih banyak ======
   const flareCount = 600;
   const flarePositions = new Float32Array(flareCount * 3);
@@ -966,10 +1015,10 @@ function createSun(): THREE.Group {
   group.add(flareParticles);
   
   // ====== LIGHTS ======
-  const sunLight = new THREE.PointLight(0xfff5dd, 50, 400, 1.8);
+  const sunLight = new THREE.PointLight(0xffffff, 100, 500, 1.5);
   group.add(sunLight);
   
-  const fillLight = new THREE.PointLight(0xffaa44, 20, 300, 2);
+  const fillLight = new THREE.PointLight(0xffdd66, 50, 400, 1.8);
   group.add(fillLight);
   
   return group;
@@ -1073,9 +1122,16 @@ export default function SpaceEnvironment() {
     // ====== VOLUMETRIC FOG PARTICLES - kabut gray di belakang matahari ======
     // Matahari di (0, 8, -80), kabut di belakangnya (z = -90 sampai -150)
     const FOG_CENTER_Z = -110; // tengah kabut di belakang matahari
-    const FOG_SPREAD_X = 60;   // penyebaran horizontal
-    const FOG_SPREAD_Y = 40;   // penyebaran vertikal
+    const FOG_SPREAD_X = 120;  // penyebaran horizontal (2x lipat)
+    const FOG_SPREAD_Y = 80;   // penyebaran vertikal (2x lipat)
     const FOG_SPREAD_Z = 40;   // penyebaran depth
+    
+    // Simpan original positions untuk animasi
+    const fogOriginalPositions = {
+      near: new Float32Array(800 * 3),
+      mid: new Float32Array(1000 * 3),
+      far: new Float32Array(1200 * 3)
+    };
     
     // Layer 1: Kabut dekat matahari - partikel besar
     const fogNearCount = 800;
@@ -1116,6 +1172,9 @@ export default function SpaceEnvironment() {
     const fogNearParticles = new THREE.Points(fogNearGeo, fogNearMat);
     scene.add(fogNearParticles);
     
+    // Simpan original positions
+    fogOriginalPositions.near.set(fogNearPositions);
+    
     // Layer 2: Kabut menengah - partikel sedang
     const fogMidCount = 1000;
     const fogMidPositions = new Float32Array(fogMidCount * 3);
@@ -1155,6 +1214,9 @@ export default function SpaceEnvironment() {
     const fogMidParticles = new THREE.Points(fogMidGeo, fogMidMat);
     scene.add(fogMidParticles);
     
+    // Simpan original positions
+    fogOriginalPositions.mid.set(fogMidPositions);
+    
     // Layer 3: Kabut jauh - partikel kecil
     const fogFarCount = 1200;
     const fogFarPositions = new Float32Array(fogFarCount * 3);
@@ -1193,6 +1255,9 @@ export default function SpaceEnvironment() {
     
     const fogFarParticles = new THREE.Points(fogFarGeo, fogFarMat);
     scene.add(fogFarParticles);
+    
+    // Simpan original positions
+    fogOriginalPositions.far.set(fogFarPositions);
 
     // ====== OBJECT POOL ======
     interface SpaceObj {
@@ -1419,7 +1484,54 @@ export default function SpaceEnvironment() {
         camera.position.add(cameraVelocity.clone().multiplyScalar(delta));
       }
 
-      // Kabut tetap di posisi world space (di belakang matahari), tidak mengikuti kamera
+      // ====== ANIMASI KABUT - bergerak di tempat (turbulence) ======
+      const fogTime = elapsed * 0.3; // kecepatan pergerakan kabut
+      
+      // Animate fog near layer
+      const fogNearPos = fogNearParticles.geometry.attributes.position;
+      for (let i = 0; i < fogNearPos.count; i++) {
+        const origX = fogOriginalPositions.near[i * 3];
+        const origY = fogOriginalPositions.near[i * 3 + 1];
+        const origZ = fogOriginalPositions.near[i * 3 + 2];
+        
+        // Pergerakan noise di tempat
+        const offsetX = Math.sin(fogTime + i * 0.1) * 2;
+        const offsetY = Math.cos(fogTime * 0.7 + i * 0.15) * 1.5;
+        const offsetZ = Math.sin(fogTime * 0.5 + i * 0.2) * 1;
+        
+        fogNearPos.setXYZ(i, origX + offsetX, origY + offsetY, origZ + offsetZ);
+      }
+      fogNearPos.needsUpdate = true;
+      
+      // Animate fog mid layer
+      const fogMidPos = fogMidParticles.geometry.attributes.position;
+      for (let i = 0; i < fogMidPos.count; i++) {
+        const origX = fogOriginalPositions.mid[i * 3];
+        const origY = fogOriginalPositions.mid[i * 3 + 1];
+        const origZ = fogOriginalPositions.mid[i * 3 + 2];
+        
+        const offsetX = Math.sin(fogTime * 0.8 + i * 0.12) * 2.5;
+        const offsetY = Math.cos(fogTime * 0.6 + i * 0.18) * 2;
+        const offsetZ = Math.sin(fogTime * 0.4 + i * 0.25) * 1.5;
+        
+        fogMidPos.setXYZ(i, origX + offsetX, origY + offsetY, origZ + offsetZ);
+      }
+      fogMidPos.needsUpdate = true;
+      
+      // Animate fog far layer
+      const fogFarPos = fogFarParticles.geometry.attributes.position;
+      for (let i = 0; i < fogFarPos.count; i++) {
+        const origX = fogOriginalPositions.far[i * 3];
+        const origY = fogOriginalPositions.far[i * 3 + 1];
+        const origZ = fogOriginalPositions.far[i * 3 + 2];
+        
+        const offsetX = Math.sin(fogTime * 0.6 + i * 0.15) * 3;
+        const offsetY = Math.cos(fogTime * 0.5 + i * 0.2) * 2.5;
+        const offsetZ = Math.sin(fogTime * 0.3 + i * 0.3) * 2;
+        
+        fogFarPos.setXYZ(i, origX + offsetX, origY + offsetY, origZ + offsetZ);
+      }
+      fogFarPos.needsUpdate = true;
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
       const sunWorldOffset = SUN_OFFSET.clone().applyQuaternion(camera.quaternion);
