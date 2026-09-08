@@ -1201,6 +1201,7 @@ export default function SpaceEnvironment() {
     });
     
     const fogNearParticles = new THREE.Points(fogNearGeo, fogNearMat);
+    fogNearParticles.frustumCulled = false; // PENTING: Jangan lakukan frustum culling!
     scene.add(fogNearParticles);
     
     // Simpan original positions
@@ -1267,6 +1268,7 @@ export default function SpaceEnvironment() {
     });
     
     const fogMidParticles = new THREE.Points(fogMidGeo, fogMidMat);
+    fogMidParticles.frustumCulled = false; // PENTING: Jangan lakukan frustum culling!
     scene.add(fogMidParticles);
     
     // Simpan original positions
@@ -1333,6 +1335,7 @@ export default function SpaceEnvironment() {
     });
     
     const fogFarParticles = new THREE.Points(fogFarGeo, fogFarMat);
+    fogFarParticles.frustumCulled = false; // PENTING: Jangan lakukan frustum culling!
     scene.add(fogFarParticles);
     
     // Simpan original positions
@@ -1652,18 +1655,24 @@ export default function SpaceEnvironment() {
       fogNearMat.uniformsNeedUpdate = true;
       fogNearMat.needsUpdate = true;
       fogNearParticles.visible = true;
+      fogNearParticles.frustumCulled = false;
+      fogNearParticles.matrixWorldNeedsUpdate = true;
       
       fogMidMat.uniforms.opacity.value = 0.25;
       fogMidMat.uniforms.size.value = 45.0;
       fogMidMat.uniformsNeedUpdate = true;
       fogMidMat.needsUpdate = true;
       fogMidParticles.visible = true;
+      fogMidParticles.frustumCulled = false;
+      fogMidParticles.matrixWorldNeedsUpdate = true;
       
       fogFarMat.uniforms.opacity.value = 0.18;
       fogFarMat.uniforms.size.value = 30.0;
       fogFarMat.uniformsNeedUpdate = true;
       fogFarMat.needsUpdate = true;
       fogFarParticles.visible = true;
+      fogFarParticles.frustumCulled = false;
+      fogFarParticles.matrixWorldNeedsUpdate = true;
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
       const sunWorldOffset = SUN_OFFSET.clone().applyQuaternion(camera.quaternion);
