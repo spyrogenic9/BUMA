@@ -966,10 +966,10 @@ function createSun(): THREE.Group {
   group.add(flareParticles);
   
   // ====== LIGHTS ======
-  const sunLight = new THREE.PointLight(0xfff5dd, 25, 300, 1.8);
+  const sunLight = new THREE.PointLight(0xfff5dd, 50, 400, 1.8);
   group.add(sunLight);
   
-  const fillLight = new THREE.PointLight(0xffaa44, 10, 200, 2);
+  const fillLight = new THREE.PointLight(0xffaa44, 20, 300, 2);
   group.add(fillLight);
   
   return group;
@@ -999,7 +999,7 @@ export default function SpaceEnvironment() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<Mode>('auto');
   const [loading, setLoading] = useState(true);
-  const [sunIntensity, setSunIntensity] = useState(3.0);
+  const [sunIntensity, setSunIntensity] = useState(4.0);
   const modeRef = useRef<Mode>('auto');
   const sunIntensityRef = useRef(2.0);
   const keysRef = useRef<Set<string>>(new Set());
@@ -1026,10 +1026,10 @@ export default function SpaceEnvironment() {
 
     // ====== SCENE ======
     const scene = new THREE.Scene();
-    // Background deep space dengan warm tint dari matahari
-    scene.background = new THREE.Color(0x0a0808);
-    // Fog tebal dengan warm tint - objek muncul dari kabut di belakang matahari
-    scene.fog = new THREE.FogExp2(0x1a1208, 0.018);
+    // Background kabut tebal - batas jarak pandang
+    scene.background = new THREE.Color(0x0d0a08);
+    // Fog SANGAT TEBAL - objek muncul dari ketiadaan
+    scene.fog = new THREE.FogExp2(0x0d0a08, 0.025);
 
     // ====== CAMERA ======
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 300);
@@ -1049,30 +1049,16 @@ export default function SpaceEnvironment() {
     );
     composer.addPass(bloomPass);
 
-    // ====== LIGHTING - ultra realistis ======
-    // Ambient light - cahaya matahari menyebar ke seluruh scene
-    const ambientLight = new THREE.AmbientLight(0x554433, 0.9);
+    // ====== LIGHTING - hanya dari matahari (seperti tata surya asli) ======
+    // Ambient light SANGAT REDUP - hanya untuk sedikit visibility
+    const ambientLight = new THREE.AmbientLight(0x111111, 0.15);
     scene.add(ambientLight);
     
     // Cahaya utama dari matahari (akan di-update posisinya)
-    const mainLight = new THREE.DirectionalLight(0xffeebb, 2.5);
+    const mainLight = new THREE.DirectionalLight(0xffeebb, 5.0);
     mainLight.position.set(0, 3, -35);
     mainLight.castShadow = false;
     scene.add(mainLight);
-    
-    // Fill light dari matahari (secondary bounce) - lebih warm
-    const fillLight = new THREE.DirectionalLight(0xffbb77, 0.8);
-    fillLight.position.set(-30, -10, 30);
-    scene.add(fillLight);
-    
-    // Hemisphere light untuk ambient sky/ground - lebih natural
-    const hemiLight = new THREE.HemisphereLight(0xffddbb, 0x223344, 0.5);
-    scene.add(hemiLight);
-    
-    // Rim light untuk edge highlighting
-    const rimLight = new THREE.DirectionalLight(0xaabbff, 0.3);
-    rimLight.position.set(20, 15, -40);
-    scene.add(rimLight);
 
     // ====== MATAHARI - di depan kamera ======
     const sun = createSun();
@@ -1084,68 +1070,7 @@ export default function SpaceEnvironment() {
     const SUN_OFFSET = new THREE.Vector3(0, 8, -80); // matahari jauh di depan
     const SUN_SAFE_RADIUS = 18; // radius aman dari matahari
 
-    // ====== BINTANG BACKGROUND - realistis dengan variasi ukuran dan warna ======
-    const starCount = 2000;
-    const starPos = new Float32Array(starCount * 3);
-    const starCol = new Float32Array(starCount * 3);
-    const starSizes = new Float32Array(starCount);
-    
-    for (let i = 0; i < starCount; i++) {
-      const r = 80 + Math.random() * 180;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      starPos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      starPos[i * 3 + 2] = r * Math.cos(phi);
-      
-      // Warna bintang berdasarkan suhu (spektrum O-B-A-F-G-K-M)
-      const temp = Math.random();
-      if (temp > 0.92) { 
-        // O/B type - biru panas
-        starCol[i*3]=0.6; starCol[i*3+1]=0.75; starCol[i*3+2]=1.0; 
-      } else if (temp > 0.8) { 
-        // A/F type - putih kebiruan
-        starCol[i*3]=0.85; starCol[i*3+1]=0.9; starCol[i*3+2]=1.0; 
-      } else if (temp > 0.65) { 
-        // G type - putih kekuningan (seperti matahari)
-        starCol[i*3]=1.0; starCol[i*3+1]=0.98; starCol[i*3+2]=0.85; 
-      } else if (temp > 0.45) { 
-        // K type - oranye
-        starCol[i*3]=1.0; starCol[i*3+1]=0.85; starCol[i*3+2]=0.6; 
-      } else { 
-        // M type - merah
-        starCol[i*3]=1.0; starCol[i*3+1]=0.7; starCol[i*3+2]=0.5; 
-      }
-      
-      // Ukuran bervariasi - kebanyakan kecil, beberapa besar
-      const sizeRand = Math.random();
-      if (sizeRand > 0.98) {
-        starSizes[i] = 1.2 + Math.random() * 0.8; // bintang sangat terang
-      } else if (sizeRand > 0.9) {
-        starSizes[i] = 0.7 + Math.random() * 0.5; // bintang terang
-      } else if (sizeRand > 0.6) {
-        starSizes[i] = 0.4 + Math.random() * 0.3; // bintang sedang
-      } else {
-        starSizes[i] = 0.2 + Math.random() * 0.2; // bintang redup
-      }
-    }
-    
-    const starGeo = new THREE.BufferGeometry();
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-    starGeo.setAttribute('color', new THREE.BufferAttribute(starCol, 3));
-    starGeo.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
-    
-    const starMat = new THREE.PointsMaterial({
-      size: 0.5,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.85,
-      sizeAttenuation: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const stars = new THREE.Points(starGeo, starMat);
-    scene.add(stars);
+    // Background adalah kabut tebal, tidak ada bintang
 
     // ====== OBJECT POOL ======
     interface SpaceObj {
@@ -1159,16 +1084,16 @@ export default function SpaceEnvironment() {
     }
 
     const objects: SpaceObj[] = [];
-    const FADE_IN_FAR = 120;   // objek mulai terlihat dari sangat jauh
-    const FADE_IN_NEAR = 60;   // objek terlihat jelas
-    const FADE_OUT_NEAR = 15;  // mulai pudar saat dekat kamera
-    const FADE_OUT_GONE = 5;   // hilang total
-    const REMOVE_DIST = 3;     // hapus dari scene
-    const SAFE_ZONE = 20;      // jarak aman dari kamera
-    const MIN_SPAWN = 70;      // spawn sangat jauh (di belakang matahari)
-    const MAX_SPAWN = 110;     // spawn paling jauh
-    const MAX_OBJECTS = 36;
-    const FADE_IN_DURATION = 6; // fade-in lebih lama untuk efek gradual
+    const FADE_IN_FAR = 70;    // objek mulai terlihat dari jauh
+    const FADE_IN_NEAR = 35;   // objek terlihat jelas
+    const FADE_OUT_NEAR = 10;  // mulai pudar saat dekat kamera
+    const FADE_OUT_GONE = 3;   // hilang total
+    const REMOVE_DIST = 1;     // hapus dari scene
+    const SAFE_ZONE = 12;      // jarak aman dari kamera
+    const MIN_SPAWN = 30;      // spawn jarak minimum
+    const MAX_SPAWN = 65;      // spawn jarak maximum
+    const MAX_OBJECTS = 45;    // lebih banyak objek
+    const FADE_IN_DURATION = 3; // fade-in lebih cepat
 
     function isPositionSafe(pos: THREE.Vector3, radius: number): boolean {
       const camDist = camera.position.distanceTo(pos);
@@ -1244,19 +1169,19 @@ export default function SpaceEnvironment() {
       let spawnPos = new THREE.Vector3();
 
       for (let attempt = 0; attempt < 20; attempt++) {
-        const angle = Math.random() * Math.PI * 2;
+        // RANDOM 360 DERAJAT - spawn di semua arah
+        const yaw = Math.random() * Math.PI * 2;
+        const pitch = (Math.random() - 0.5) * Math.PI * 0.8; // -80° sampai +80°
         const dist = MIN_SPAWN + Math.random() * (MAX_SPAWN - MIN_SPAWN);
-        const height = (Math.random() - 0.5) * 50;
 
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+        // Hitung posisi spawn dalam world space
+        const spawnDir = new THREE.Vector3(
+          Math.cos(pitch) * Math.sin(yaw),
+          Math.sin(pitch),
+          Math.cos(pitch) * Math.cos(yaw)
+        );
 
-        // Spawn DI DEPAN kamera (di arah matahari, dari balik kabut)
-        spawnPos = camera.position.clone()
-          .add(forward.clone().multiplyScalar(dist))
-          .add(right.clone().multiplyScalar(Math.cos(angle) * dist * 0.4))
-          .add(up.clone().multiplyScalar(height));
+        spawnPos = camera.position.clone().add(spawnDir.multiplyScalar(dist));
 
         if (isPositionSafe(spawnPos, radius)) {
           placed = true;
@@ -1280,28 +1205,24 @@ export default function SpaceEnvironment() {
       scene.add(mesh);
 
       const rotSpeed = new THREE.Vector3(
-        (Math.random() - 0.5) * 0.008,
-        (Math.random() - 0.5) * 0.008,
-        (Math.random() - 0.5) * 0.008
+        (Math.random() - 0.5) * 0.01,
+        (Math.random() - 0.5) * 0.01,
+        (Math.random() - 0.5) * 0.01
       );
       
-      // Drift velocity - objek bergerak mendekati kamera dari balik kabut
-      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-      
-      // Kecepatan utama ke arah kamera (dari depan ke belakang)
-      const driftVel = new THREE.Vector3()
-        .add(forward.clone().multiplyScalar(-1.5 - Math.random() * 1.0)) // bergerak ke kamera
-        .add(right.clone().multiplyScalar((Math.random() - 0.5) * 0.3))   // sedikit ke samping
-        .add(up.clone().multiplyScalar((Math.random() - 0.5) * 0.2));     // sedikit ke atas/bawah
+      // Drift velocity - gerakan random natural
+      const driftVel = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.8,
+        (Math.random() - 0.5) * 0.4,
+        (Math.random() - 0.5) * 0.8
+      );
 
       objects.push({ mesh, type, radius, rotSpeed, driftVel, age: 0, baseOpacity });
       return true;
     }
 
-    // Spawn awal - lebih banyak untuk populate scene
-    for (let i = 0; i < 25; i++) {
+    // Spawn awal - langsung penuh
+    for (let i = 0; i < 35; i++) {
       spawnObject();
     }
 
@@ -1380,7 +1301,7 @@ export default function SpaceEnvironment() {
         camera.position.add(cameraVelocity.clone().multiplyScalar(delta));
       }
 
-      stars.position.copy(camera.position);
+      // Tidak ada star field, background adalah kabut
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
       const sunWorldOffset = SUN_OFFSET.clone().applyQuaternion(camera.quaternion);
@@ -1389,11 +1310,11 @@ export default function SpaceEnvironment() {
       // Update directional light mengikuti matahari
       mainLight.position.copy(sun.position);
       
-      // Update intensity matahari dari slider
+      // Update intensity matahari dari slider (2x lipat)
       if (sunLight) {
-        sunLight.intensity = sunIntensityRef.current * 5;
+        sunLight.intensity = sunIntensityRef.current * 10;
       }
-      mainLight.intensity = sunIntensityRef.current * 1.0;
+      mainLight.intensity = sunIntensityRef.current * 2.0;
       
       // ====== ANIMASI PARTIKEL MATAHARI ======
       // Animasi solar flare particles - bergerak keluar dari inti
@@ -1487,9 +1408,9 @@ export default function SpaceEnvironment() {
         }
       }
 
-      // ====== LOOP SPAWN - 2x lebih cepat ======
+      // ====== LOOP SPAWN - cepat dan konsisten ======
       spawnTimer += delta;
-      if (objects.length < MAX_OBJECTS && spawnTimer > 0.5) {
+      if (objects.length < MAX_OBJECTS && spawnTimer > 0.3) {
         spawnObject();
         spawnTimer = 0;
       }
