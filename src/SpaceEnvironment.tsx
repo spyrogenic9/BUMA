@@ -397,40 +397,51 @@ function createWreck(): THREE.Group {
 function createSun(): THREE.Group {
   const group = new THREE.Group();
   
-  // Inti matahari
-  const sunGeo = new THREE.SphereGeometry(3, 32, 32);
+  // Inti matahari - LEBIH BESAR
+  const sunGeo = new THREE.SphereGeometry(8, 48, 48);
   const sunMat = new THREE.MeshBasicMaterial({
-    color: 0xffdd44,
+    color: 0xffee55,
     transparent: true,
-    opacity: 0.95,
+    opacity: 1.0,
   });
   const sun = new THREE.Mesh(sunGeo, sunMat);
   group.add(sun);
   
-  // Glow layer 1
-  const glow1Geo = new THREE.SphereGeometry(4, 32, 32);
+  // Glow layer 1 - LEBIH BESAR
+  const glow1Geo = new THREE.SphereGeometry(12, 48, 48);
   const glow1Mat = new THREE.MeshBasicMaterial({
     color: 0xffaa22,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.5,
     side: THREE.BackSide,
   });
   const glow1 = new THREE.Mesh(glow1Geo, glow1Mat);
   group.add(glow1);
   
-  // Glow layer 2
-  const glow2Geo = new THREE.SphereGeometry(5.5, 32, 32);
+  // Glow layer 2 - LEBIH BESAR
+  const glow2Geo = new THREE.SphereGeometry(18, 48, 48);
   const glow2Mat = new THREE.MeshBasicMaterial({
     color: 0xff8800,
     transparent: true,
-    opacity: 0.15,
+    opacity: 0.3,
     side: THREE.BackSide,
   });
   const glow2 = new THREE.Mesh(glow2Geo, glow2Mat);
   group.add(glow2);
   
-  // Point light untuk menerangi sekitar
-  const sunLight = new THREE.PointLight(0xffdd66, 2, 100);
+  // Glow layer 3 - SANGAT BESAR
+  const glow3Geo = new THREE.SphereGeometry(25, 48, 48);
+  const glow3Mat = new THREE.MeshBasicMaterial({
+    color: 0xff6600,
+    transparent: true,
+    opacity: 0.15,
+    side: THREE.BackSide,
+  });
+  const glow3 = new THREE.Mesh(glow3Geo, glow3Mat);
+  group.add(glow3);
+  
+  // Point light SANGAT TERANG untuk menerangi sekitar
+  const sunLight = new THREE.PointLight(0xffdd66, 8, 150);
   group.add(sunLight);
   
   return group;
@@ -491,17 +502,21 @@ export default function SpaceEnvironment() {
     camera.position.set(0, 0, 0);
 
     // ====== LIGHTING ======
-    scene.add(new THREE.AmbientLight(0x111122, 0.3));
-    const mainLight = new THREE.DirectionalLight(0xffeedd, 0.8);
-    mainLight.position.set(50, 30, -50);
+    scene.add(new THREE.AmbientLight(0x222233, 0.5));
+    
+    // Cahaya utama dari matahari (akan di-update posisinya)
+    const mainLight = new THREE.DirectionalLight(0xffdd88, 1.5);
+    mainLight.position.set(0, 3, -35);
     scene.add(mainLight);
-    const fillLight = new THREE.DirectionalLight(0x4466aa, 0.25);
+    
+    const fillLight = new THREE.DirectionalLight(0x4466aa, 0.3);
     fillLight.position.set(-30, -10, 30);
     scene.add(fillLight);
 
     // ====== MATAHARI - di depan kamera ======
     const sun = createSun();
-    sun.position.set(0, 5, -60); // di depan dan sedikit atas
+    // Posisi lebih dekat agar terlihat jelas
+    const sunBaseOffset = new THREE.Vector3(0, 3, -35);
     scene.add(sun);
     
     // Simpan referensi sunLight untuk update intensity
@@ -737,14 +752,18 @@ export default function SpaceEnvironment() {
       stars.position.copy(camera.position);
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
-      const sunOffset = new THREE.Vector3(0, 8, -65);
+      const sunOffset = new THREE.Vector3(0, 3, -35);
       const sunWorldOffset = sunOffset.clone().applyQuaternion(camera.quaternion);
       sun.position.copy(camera.position).add(sunWorldOffset);
       
+      // Update directional light mengikuti matahari
+      mainLight.position.copy(sun.position);
+      
       // Update intensity matahari dari slider
       if (sunLight) {
-        sunLight.intensity = sunIntensityRef.current;
+        sunLight.intensity = sunIntensityRef.current * 4; // Scale up intensity
       }
+      mainLight.intensity = sunIntensityRef.current * 0.8;
 
       // ====== UPDATE OBJEK ======
       for (let i = objects.length - 1; i >= 0; i--) {
