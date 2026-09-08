@@ -1125,9 +1125,9 @@ export default function SpaceEnvironment() {
     // Kabut: offset (0, 8, -110) dari kamera (30 unit di belakang matahari)
     
     const FOG_OFFSET = new THREE.Vector3(0, 8, -110); // posisi kabut relatif terhadap kamera
-    const FOG_SPREAD_X = 156;  // penyebaran horizontal (1.3x dari 120)
-    const FOG_SPREAD_Y = 104;  // penyebaran vertikal (1.3x dari 80)
-    const FOG_SPREAD_Z = 50;   // penyebaran depth
+    const FOG_SPREAD_X = 312;  // penyebaran horizontal (2x lipat)
+    const FOG_SPREAD_Y = 208;  // penyebaran vertikal (2x lipat)
+    const FOG_SPREAD_Z = 100;  // penyebaran depth (2x lipat)
     
     // Simpan original positions untuk animasi (relatif terhadap center kabut)
     const fogOriginalPositions = {
@@ -1163,10 +1163,10 @@ export default function SpaceEnvironment() {
     fogNearGeo.setAttribute('color', new THREE.BufferAttribute(fogNearColors, 3));
     
     const fogNearMat = new THREE.PointsMaterial({
-      size: 20,
+      size: 35,  // lebih besar untuk efek lebih tebal
       vertexColors: true,
       transparent: true,
-      opacity: 0.24,  // 3x lebih tebal
+      opacity: 0.95,  // 5x lebih tebal (max)
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1205,10 +1205,10 @@ export default function SpaceEnvironment() {
     fogMidGeo.setAttribute('color', new THREE.BufferAttribute(fogMidColors, 3));
     
     const fogMidMat = new THREE.PointsMaterial({
-      size: 15,
+      size: 28,  // lebih besar untuk efek lebih tebal
       vertexColors: true,
       transparent: true,
-      opacity: 0.18,  // 3x lebih tebal
+      opacity: 0.9,  // 5x lebih tebal
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1247,10 +1247,10 @@ export default function SpaceEnvironment() {
     fogFarGeo.setAttribute('color', new THREE.BufferAttribute(fogFarColors, 3));
     
     const fogFarMat = new THREE.PointsMaterial({
-      size: 10,
+      size: 22,  // lebih besar untuk efek lebih tebal
       vertexColors: true,
       transparent: true,
-      opacity: 0.15,  // 3x lebih tebal
+      opacity: 0.75,  // 5x lebih tebal
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1499,6 +1499,11 @@ export default function SpaceEnvironment() {
       const fogWorldOffset = FOG_OFFSET.clone().applyQuaternion(camera.quaternion);
       const fogCenterPos = camera.position.clone().add(fogWorldOffset);
       
+      // Pastikan kabut selalu ada (opacity tidak pernah berubah)
+      fogNearMat.opacity = 0.95;
+      fogMidMat.opacity = 0.9;
+      fogFarMat.opacity = 0.75;
+      
       const fogTime = elapsed * 0.3; // kecepatan pergerakan kabut
       
       // Update fog near layer - posisi absolut + animasi lokal
@@ -1647,6 +1652,21 @@ export default function SpaceEnvironment() {
           const pushDir = obj.mesh.position.clone().sub(sun.position).normalize();
           const pushStrength = (SUN_SAFE_DISTANCE + obj.radius - distToSun) * 0.5;
           obj.mesh.position.add(pushDir.multiplyScalar(pushStrength));
+        }
+
+        // ====== ANTI-TABRAKAN ANTAR OBJEK ======
+        for (let j = 0; j < objects.length; j++) {
+          if (i === j) continue; // skip diri sendiri
+          const other = objects[j];
+          const distBetween = obj.mesh.position.distanceTo(other.mesh.position);
+          const minDist = obj.radius + other.radius + 2; // 2 unit buffer
+          
+          if (distBetween < minDist) {
+            // Push menjauh dari objek lain
+            const pushDir = obj.mesh.position.clone().sub(other.mesh.position).normalize();
+            const pushStrength = (minDist - distBetween) * 0.3;
+            obj.mesh.position.add(pushDir.multiplyScalar(pushStrength));
+          }
         }
 
         // ====== FADE ======
