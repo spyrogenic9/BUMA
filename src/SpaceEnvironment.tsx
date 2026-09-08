@@ -916,7 +916,7 @@ function createWreck(): THREE.Group {
   return group;
 }
 
-// ====== MATAHARI - bulat sempurna 2x lebih besar ======
+// ====== MATAHARI - bulat sempurna 2x lebih besar dengan glow SUPER TERANG ======
 function createSun(): THREE.Group {
   const group = new THREE.Group();
   
@@ -928,49 +928,49 @@ function createSun(): THREE.Group {
   const sun = new THREE.Mesh(sunGeo, sunMat);
   group.add(sun);
   
-  // ====== GLOW LAYERS - membuat matahari lebih terang ======
-  // Inner glow - kuning terang
-  const glow1Geo = new THREE.SphereGeometry(7, 32, 32);
+  // ====== GLOW LAYERS - SUPER TERANG ======
+  // Inner glow - putih kekuningan
+  const glow1Geo = new THREE.SphereGeometry(8, 48, 48);
   const glow1Mat = new THREE.MeshBasicMaterial({
-    color: 0xffffaa,
+    color: 0xffffcc,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.8,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   const glow1 = new THREE.Mesh(glow1Geo, glow1Mat);
   group.add(glow1);
   
-  // Middle glow - kuning
-  const glow2Geo = new THREE.SphereGeometry(8.5, 32, 32);
+  // Middle glow - kuning terang
+  const glow2Geo = new THREE.SphereGeometry(11, 48, 48);
   const glow2Mat = new THREE.MeshBasicMaterial({
-    color: 0xffee66,
+    color: 0xffee88,
     transparent: true,
-    opacity: 0.4,
+    opacity: 0.6,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   const glow2 = new THREE.Mesh(glow2Geo, glow2Mat);
   group.add(glow2);
   
-  // Outer glow - oranye
-  const glow3Geo = new THREE.SphereGeometry(10.5, 32, 32);
+  // Outer glow - oranye terang
+  const glow3Geo = new THREE.SphereGeometry(15, 48, 48);
   const glow3Mat = new THREE.MeshBasicMaterial({
-    color: 0xffcc33,
+    color: 0xffdd44,
     transparent: true,
-    opacity: 0.25,
+    opacity: 0.4,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   const glow3 = new THREE.Mesh(glow3Geo, glow3Mat);
   group.add(glow3);
   
-  // Corona - sangat luar
-  const coronaGeo = new THREE.SphereGeometry(13, 32, 32);
+  // Corona - sangat besar dan terang
+  const coronaGeo = new THREE.SphereGeometry(20, 48, 48);
   const coronaMat = new THREE.MeshBasicMaterial({
-    color: 0xffaa00,
+    color: 0xffcc00,
     transparent: true,
-    opacity: 0.15,
+    opacity: 0.25,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -1014,12 +1014,16 @@ function createSun(): THREE.Group {
   const flareParticles = new THREE.Points(flareGeo, flareMat);
   group.add(flareParticles);
   
-  // ====== LIGHTS ======
-  const sunLight = new THREE.PointLight(0xffffff, 100, 500, 1.5);
+  // ====== LIGHTS - SUPER TERANG ======
+  const sunLight = new THREE.PointLight(0xffffff, 200, 800, 1.2);
   group.add(sunLight);
   
-  const fillLight = new THREE.PointLight(0xffdd66, 50, 400, 1.8);
+  const fillLight = new THREE.PointLight(0xffee88, 100, 600, 1.5);
   group.add(fillLight);
+  
+  // Tambahan light untuk efek glow yang lebih kuat
+  const glowLight = new THREE.PointLight(0xffdd44, 80, 500, 1.8);
+  group.add(glowLight);
   
   return group;
 }
@@ -1103,8 +1107,8 @@ export default function SpaceEnvironment() {
     const ambientLight = new THREE.AmbientLight(0x111111, 0.15);
     scene.add(ambientLight);
     
-    // Cahaya utama dari matahari (akan di-update posisinya)
-    const mainLight = new THREE.DirectionalLight(0xffeebb, 5.0);
+    // Cahaya utama dari matahari (akan di-update posisinya) - SUPER TERANG
+    const mainLight = new THREE.DirectionalLight(0xffeebb, 10.0);
     mainLight.position.set(0, 3, -35);
     mainLight.castShadow = false;
     scene.add(mainLight);
@@ -1151,8 +1155,8 @@ export default function SpaceEnvironment() {
       fogNearPositions[i * 3 + 1] = y;
       fogNearPositions[i * 3 + 2] = z;
       
-      // Warna GRAY
-      const brightness = 0.3 + Math.random() * 0.15;
+      // Warna GRAY terang untuk solid look
+      const brightness = 0.6 + Math.random() * 0.25;
       fogNearColors[i * 3] = brightness;
       fogNearColors[i * 3 + 1] = brightness;
       fogNearColors[i * 3 + 2] = brightness;
@@ -1163,11 +1167,11 @@ export default function SpaceEnvironment() {
     fogNearGeo.setAttribute('color', new THREE.BufferAttribute(fogNearColors, 3));
     
     const fogNearMat = new THREE.PointsMaterial({
-      size: 35,  // lebih besar untuk efek lebih tebal
+      size: 50,  // lebih besar untuk overlap
       vertexColors: true,
       transparent: true,
-      opacity: 0.95,  // 5x lebih tebal (max)
-      blending: THREE.AdditiveBlending,
+      opacity: 1.0,  // fully opaque
+      blending: THREE.NormalBlending,  // normal blending untuk solid look
       depthWrite: false,
       sizeAttenuation: true,
     });
@@ -1193,8 +1197,8 @@ export default function SpaceEnvironment() {
       fogMidPositions[i * 3 + 1] = y;
       fogMidPositions[i * 3 + 2] = z;
       
-      // Warna GRAY lebih gelap
-      const brightness = 0.25 + Math.random() * 0.12;
+      // Warna GRAY terang untuk solid look
+      const brightness = 0.55 + Math.random() * 0.2;
       fogMidColors[i * 3] = brightness;
       fogMidColors[i * 3 + 1] = brightness;
       fogMidColors[i * 3 + 2] = brightness;
@@ -1205,11 +1209,11 @@ export default function SpaceEnvironment() {
     fogMidGeo.setAttribute('color', new THREE.BufferAttribute(fogMidColors, 3));
     
     const fogMidMat = new THREE.PointsMaterial({
-      size: 28,  // lebih besar untuk efek lebih tebal
+      size: 38,  // lebih besar untuk overlap
       vertexColors: true,
       transparent: true,
-      opacity: 0.9,  // 5x lebih tebal
-      blending: THREE.AdditiveBlending,
+      opacity: 1.0,  // fully opaque
+      blending: THREE.NormalBlending,  // normal blending untuk solid look
       depthWrite: false,
       sizeAttenuation: true,
     });
@@ -1235,8 +1239,8 @@ export default function SpaceEnvironment() {
       fogFarPositions[i * 3 + 1] = y;
       fogFarPositions[i * 3 + 2] = z;
       
-      // Warna GRAY paling gelap
-      const brightness = 0.2 + Math.random() * 0.1;
+      // Warna GRAY terang untuk solid look
+      const brightness = 0.5 + Math.random() * 0.15;
       fogFarColors[i * 3] = brightness;
       fogFarColors[i * 3 + 1] = brightness;
       fogFarColors[i * 3 + 2] = brightness;
@@ -1247,11 +1251,11 @@ export default function SpaceEnvironment() {
     fogFarGeo.setAttribute('color', new THREE.BufferAttribute(fogFarColors, 3));
     
     const fogFarMat = new THREE.PointsMaterial({
-      size: 22,  // lebih besar untuk efek lebih tebal
+      size: 30,  // lebih besar untuk overlap
       vertexColors: true,
       transparent: true,
-      opacity: 0.75,  // 5x lebih tebal
-      blending: THREE.AdditiveBlending,
+      opacity: 1.0,  // fully opaque
+      blending: THREE.NormalBlending,  // normal blending untuk solid look
       depthWrite: false,
       sizeAttenuation: true,
     });
@@ -1499,10 +1503,16 @@ export default function SpaceEnvironment() {
       const fogWorldOffset = FOG_OFFSET.clone().applyQuaternion(camera.quaternion);
       const fogCenterPos = camera.position.clone().add(fogWorldOffset);
       
-      // Pastikan kabut selalu ada (opacity tidak pernah berubah)
-      fogNearMat.opacity = 0.95;
-      fogMidMat.opacity = 0.9;
-      fogFarMat.opacity = 0.75;
+      // PENTING: Pastikan kabut SELALU ADA dan TIDAK PERNAH MENGHILANG
+      // Reset opacity ke 1.0 setiap frame untuk memastikan kabut tidak memudar
+      fogNearMat.opacity = 1.0;
+      fogMidMat.opacity = 1.0;
+      fogFarMat.opacity = 1.0;
+      
+      // Pastikan material tidak berubah
+      fogNearMat.transparent = true;
+      fogMidMat.transparent = true;
+      fogFarMat.transparent = true;
       
       const fogTime = elapsed * 0.3; // kecepatan pergerakan kabut
       
@@ -1575,11 +1585,11 @@ export default function SpaceEnvironment() {
       // Update directional light mengikuti matahari
       mainLight.position.copy(sun.position);
       
-      // Update intensity matahari dari slider
+      // Update intensity matahari dari slider - SUPER TERANG
       if (sunLight) {
-        sunLight.intensity = sunIntensityRef.current * 10;
+        sunLight.intensity = sunIntensityRef.current * 20;
       }
-      mainLight.intensity = sunIntensityRef.current * 2.0;
+      mainLight.intensity = sunIntensityRef.current * 4.0;
       
       // ====== ANIMASI PARTIKEL MATAHARI ======
       // Animasi solar flare particles - bergerak keluar dari inti
