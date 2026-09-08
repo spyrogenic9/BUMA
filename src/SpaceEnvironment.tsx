@@ -1014,15 +1014,15 @@ function createSun(): THREE.Group {
   const flareParticles = new THREE.Points(flareGeo, flareMat);
   group.add(flareParticles);
   
-  // ====== LIGHTS - SUPER TERANG ======
-  const sunLight = new THREE.PointLight(0xffffff, 200, 800, 1.2);
+  // ====== LIGHTS - SUPER TERANG 2x LIPAT ======
+  const sunLight = new THREE.PointLight(0xffffff, 400, 800, 1.2);
   group.add(sunLight);
   
-  const fillLight = new THREE.PointLight(0xffee88, 100, 600, 1.5);
+  const fillLight = new THREE.PointLight(0xffee88, 200, 600, 1.5);
   group.add(fillLight);
   
   // Tambahan light untuk efek glow yang lebih kuat
-  const glowLight = new THREE.PointLight(0xffdd44, 80, 500, 1.8);
+  const glowLight = new THREE.PointLight(0xffdd44, 160, 500, 1.8);
   group.add(glowLight);
   
   return group;
@@ -1107,8 +1107,8 @@ export default function SpaceEnvironment() {
     const ambientLight = new THREE.AmbientLight(0x111111, 0.15);
     scene.add(ambientLight);
     
-    // Cahaya utama dari matahari (akan di-update posisinya) - SUPER TERANG
-    const mainLight = new THREE.DirectionalLight(0xffeebb, 10.0);
+    // Cahaya utama dari matahari (akan di-update posisinya) - SUPER TERANG 2x LIPAT
+    const mainLight = new THREE.DirectionalLight(0xffeebb, 20.0);
     mainLight.position.set(0, 3, -35);
     mainLight.castShadow = false;
     scene.add(mainLight);
@@ -1135,13 +1135,13 @@ export default function SpaceEnvironment() {
     
     // Simpan original positions untuk animasi (relatif terhadap center kabut)
     const fogOriginalPositions = {
-      near: new Float32Array(1200 * 3),
-      mid: new Float32Array(1500 * 3),
-      far: new Float32Array(2000 * 3)
+      near: new Float32Array(6000 * 3),
+      mid: new Float32Array(7500 * 3),
+      far: new Float32Array(10000 * 3)
     };
     
     // Layer 1: Kabut dekat matahari - partikel besar
-    const fogNearCount = 1200;  // lebih banyak partikel
+    const fogNearCount = 6000;  // 5x lipat untuk efek sangat tebal
     const fogNearPositions = new Float32Array(fogNearCount * 3);
     const fogNearColors = new Float32Array(fogNearCount * 3);
     
@@ -1155,8 +1155,8 @@ export default function SpaceEnvironment() {
       fogNearPositions[i * 3 + 1] = y;
       fogNearPositions[i * 3 + 2] = z;
       
-      // Warna GRAY terang untuk solid look
-      const brightness = 0.6 + Math.random() * 0.25;
+      // Warna GRAY
+      const brightness = 0.3 + Math.random() * 0.15;
       fogNearColors[i * 3] = brightness;
       fogNearColors[i * 3 + 1] = brightness;
       fogNearColors[i * 3 + 2] = brightness;
@@ -1167,11 +1167,11 @@ export default function SpaceEnvironment() {
     fogNearGeo.setAttribute('color', new THREE.BufferAttribute(fogNearColors, 3));
     
     const fogNearMat = new THREE.PointsMaterial({
-      size: 50,  // lebih besar untuk overlap
+      size: 60,  // sangat besar untuk overlap maksimal
       vertexColors: true,
       transparent: true,
-      opacity: 1.0,  // fully opaque
-      blending: THREE.NormalBlending,  // normal blending untuk solid look
+      opacity: 1.0,  // max opacity
+      blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
     });
@@ -1183,7 +1183,7 @@ export default function SpaceEnvironment() {
     fogOriginalPositions.near.set(fogNearPositions);
     
     // Layer 2: Kabut menengah - partikel sedang
-    const fogMidCount = 1500;  // lebih banyak partikel
+    const fogMidCount = 7500;  // 5x lipat untuk efek sangat tebal
     const fogMidPositions = new Float32Array(fogMidCount * 3);
     const fogMidColors = new Float32Array(fogMidCount * 3);
     
@@ -1197,8 +1197,8 @@ export default function SpaceEnvironment() {
       fogMidPositions[i * 3 + 1] = y;
       fogMidPositions[i * 3 + 2] = z;
       
-      // Warna GRAY terang untuk solid look
-      const brightness = 0.55 + Math.random() * 0.2;
+      // Warna GRAY lebih gelap
+      const brightness = 0.25 + Math.random() * 0.12;
       fogMidColors[i * 3] = brightness;
       fogMidColors[i * 3 + 1] = brightness;
       fogMidColors[i * 3 + 2] = brightness;
@@ -1209,11 +1209,11 @@ export default function SpaceEnvironment() {
     fogMidGeo.setAttribute('color', new THREE.BufferAttribute(fogMidColors, 3));
     
     const fogMidMat = new THREE.PointsMaterial({
-      size: 38,  // lebih besar untuk overlap
+      size: 45,  // sangat besar untuk overlap maksimal
       vertexColors: true,
       transparent: true,
-      opacity: 1.0,  // fully opaque
-      blending: THREE.NormalBlending,  // normal blending untuk solid look
+      opacity: 1.0,  // max opacity
+      blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
     });
@@ -1225,7 +1225,7 @@ export default function SpaceEnvironment() {
     fogOriginalPositions.mid.set(fogMidPositions);
     
     // Layer 3: Kabut jauh - partikel kecil
-    const fogFarCount = 2000;  // lebih banyak partikel
+    const fogFarCount = 10000;  // 5x lipat untuk efek sangat tebal
     const fogFarPositions = new Float32Array(fogFarCount * 3);
     const fogFarColors = new Float32Array(fogFarCount * 3);
     
@@ -1239,8 +1239,8 @@ export default function SpaceEnvironment() {
       fogFarPositions[i * 3 + 1] = y;
       fogFarPositions[i * 3 + 2] = z;
       
-      // Warna GRAY terang untuk solid look
-      const brightness = 0.5 + Math.random() * 0.15;
+      // Warna GRAY paling gelap
+      const brightness = 0.2 + Math.random() * 0.1;
       fogFarColors[i * 3] = brightness;
       fogFarColors[i * 3 + 1] = brightness;
       fogFarColors[i * 3 + 2] = brightness;
@@ -1251,11 +1251,11 @@ export default function SpaceEnvironment() {
     fogFarGeo.setAttribute('color', new THREE.BufferAttribute(fogFarColors, 3));
     
     const fogFarMat = new THREE.PointsMaterial({
-      size: 30,  // lebih besar untuk overlap
+      size: 35,  // sangat besar untuk overlap maksimal
       vertexColors: true,
       transparent: true,
-      opacity: 1.0,  // fully opaque
-      blending: THREE.NormalBlending,  // normal blending untuk solid look
+      opacity: 1.0,  // max opacity
+      blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
     });
@@ -1585,11 +1585,11 @@ export default function SpaceEnvironment() {
       // Update directional light mengikuti matahari
       mainLight.position.copy(sun.position);
       
-      // Update intensity matahari dari slider - SUPER TERANG
+      // Update intensity matahari dari slider - SUPER TERANG 2x LIPAT
       if (sunLight) {
-        sunLight.intensity = sunIntensityRef.current * 20;
+        sunLight.intensity = sunIntensityRef.current * 40;
       }
-      mainLight.intensity = sunIntensityRef.current * 4.0;
+      mainLight.intensity = sunIntensityRef.current * 8.0;
       
       // ====== ANIMASI PARTIKEL MATAHARI ======
       // Animasi solar flare particles - bergerak keluar dari inti
