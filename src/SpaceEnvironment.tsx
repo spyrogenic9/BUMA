@@ -1126,12 +1126,12 @@ export default function SpaceEnvironment() {
     // ====== VOLUMETRIC FOG PARTICLES - kabut gray SELALU di belakang matahari ======
     // Kabut RELATIF terhadap kamera, tapi selalu di belakang matahari
     // Matahari: offset (0, 8, -80) dari kamera
-    // Kabut: offset (0, 8, -160) dari kamera (80 unit di belakang matahari)
+    // Kabut: offset (0, 8, -50) dari kamera (30 unit di belakang matahari)
     
-    const FOG_OFFSET = new THREE.Vector3(0, 8, -160); // posisi kabut relatif terhadap kamera (mundur 50 unit)
-    const FOG_SPREAD_X = 374;  // penyebaran horizontal (20% lebih besar dari 312)
-    const FOG_SPREAD_Y = 250;  // penyebaran vertikal (20% lebih besar dari 208)
-    const FOG_SPREAD_Z = 120;  // penyebaran depth (20% lebih besar dari 100)
+    const FOG_OFFSET = new THREE.Vector3(0, 8, -50); // posisi kabut relatif terhadap kamera
+    const FOG_SPREAD_X = 374;  // penyebaran horizontal
+    const FOG_SPREAD_Y = 250;  // penyebaran vertikal
+    const FOG_SPREAD_Z = 120;  // penyebaran depth
     
     // Simpan original positions untuk animasi (relatif terhadap center kabut)
     const fogOriginalPositions = {
@@ -1166,14 +1166,36 @@ export default function SpaceEnvironment() {
     fogNearGeo.setAttribute('position', new THREE.BufferAttribute(fogNearPositions, 3));
     fogNearGeo.setAttribute('color', new THREE.BufferAttribute(fogNearColors, 3));
     
-    const fogNearMat = new THREE.PointsMaterial({
-      size: 60, // 3x lebih besar untuk coverage lebih baik
-      vertexColors: true,
+    // Custom shader material untuk kabut yang TIDAK BISA DIUBAH oleh three.js
+    const fogNearMat = new THREE.ShaderMaterial({
+      uniforms: {
+        opacity: { value: 0.72 },
+        size: { value: 60.0 }
+      },
+      vertexShader: `
+        uniform float size;
+        attribute vec3 color;
+        varying vec3 vColor;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform float opacity;
+        varying vec3 vColor;
+        void main() {
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          float alpha = opacity * (1.0 - dist * 2.0);
+          gl_FragColor = vec4(vColor, alpha);
+        }
+      `,
       transparent: true,
-      opacity: 0.72, // 3x lebih tebal (0.24 * 3)
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      sizeAttenuation: true,
     });
     
     const fogNearParticles = new THREE.Points(fogNearGeo, fogNearMat);
@@ -1208,14 +1230,36 @@ export default function SpaceEnvironment() {
     fogMidGeo.setAttribute('position', new THREE.BufferAttribute(fogMidPositions, 3));
     fogMidGeo.setAttribute('color', new THREE.BufferAttribute(fogMidColors, 3));
     
-    const fogMidMat = new THREE.PointsMaterial({
-      size: 45, // 3x lebih besar
-      vertexColors: true,
+    // Custom shader material untuk kabut yang TIDAK BISA DIUBAH oleh three.js
+    const fogMidMat = new THREE.ShaderMaterial({
+      uniforms: {
+        opacity: { value: 0.54 },
+        size: { value: 45.0 }
+      },
+      vertexShader: `
+        uniform float size;
+        attribute vec3 color;
+        varying vec3 vColor;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform float opacity;
+        varying vec3 vColor;
+        void main() {
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          float alpha = opacity * (1.0 - dist * 2.0);
+          gl_FragColor = vec4(vColor, alpha);
+        }
+      `,
       transparent: true,
-      opacity: 0.54, // 3x lebih tebal (0.18 * 3)
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      sizeAttenuation: true,
     });
     
     const fogMidParticles = new THREE.Points(fogMidGeo, fogMidMat);
@@ -1250,14 +1294,36 @@ export default function SpaceEnvironment() {
     fogFarGeo.setAttribute('position', new THREE.BufferAttribute(fogFarPositions, 3));
     fogFarGeo.setAttribute('color', new THREE.BufferAttribute(fogFarColors, 3));
     
-    const fogFarMat = new THREE.PointsMaterial({
-      size: 30, // 3x lebih besar
-      vertexColors: true,
+    // Custom shader material untuk kabut yang TIDAK BISA DIUBAH oleh three.js
+    const fogFarMat = new THREE.ShaderMaterial({
+      uniforms: {
+        opacity: { value: 0.45 },
+        size: { value: 30.0 }
+      },
+      vertexShader: `
+        uniform float size;
+        attribute vec3 color;
+        varying vec3 vColor;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform float opacity;
+        varying vec3 vColor;
+        void main() {
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          float alpha = opacity * (1.0 - dist * 2.0);
+          gl_FragColor = vec4(vColor, alpha);
+        }
+      `,
       transparent: true,
-      opacity: 0.45, // 3x lebih tebal (0.15 * 3)
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      sizeAttenuation: true,
     });
     
     const fogFarParticles = new THREE.Points(fogFarGeo, fogFarMat);
@@ -1287,6 +1353,7 @@ export default function SpaceEnvironment() {
     const SUN_SAFE_DISTANCE = 25; // jarak aman dari matahari
     const MAX_OBJECTS = 50;    // lebih banyak objek
     const FADE_IN_DURATION = 4; // fade-in duration
+    let nextSpawnDelay = 1.0 + Math.random() * 2.0; // delay random 1-3 detik untuk spawn pertama
 
     function isPositionSafe(pos: THREE.Vector3, radius: number): boolean {
       const camDist = camera.position.distanceTo(pos);
@@ -1570,20 +1637,15 @@ export default function SpaceEnvironment() {
       fogFarPos.needsUpdate = true;
       
       // PENTING: Reset material properties SETELAH update posisi partikel
-      fogNearMat.opacity = 0.72;
-      fogNearMat.size = 60;
-      fogNearMat.transparent = true;
-      fogNearMat.needsUpdate = true;
+      // Menggunakan ShaderMaterial yang TIDAK BISA DIUBAH oleh three.js
+      fogNearMat.uniforms.opacity.value = 0.72;
+      fogNearMat.uniforms.size.value = 60.0;
       
-      fogMidMat.opacity = 0.54;
-      fogMidMat.size = 45;
-      fogMidMat.transparent = true;
-      fogMidMat.needsUpdate = true;
+      fogMidMat.uniforms.opacity.value = 0.54;
+      fogMidMat.uniforms.size.value = 45.0;
       
-      fogFarMat.opacity = 0.45;
-      fogFarMat.size = 30;
-      fogFarMat.transparent = true;
-      fogFarMat.needsUpdate = true;
+      fogFarMat.uniforms.opacity.value = 0.45;
+      fogFarMat.uniforms.size.value = 30.0;
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
       const sunWorldOffset = SUN_OFFSET.clone().applyQuaternion(camera.quaternion);
@@ -1721,13 +1783,15 @@ export default function SpaceEnvironment() {
         }
       }
 
-      // ====== LOOP SPAWN - berurutan tapi random, max 3 detik ======
+      // ====== LOOP SPAWN - random 1-3 detik, bergiliran ======
       spawnTimer += delta;
       
-      // Spawn setiap 3 detik max (berurutan)
-      if (objects.length < MAX_OBJECTS && spawnTimer > 3.0) {
+      // Spawn dengan delay random 1-3 detik (bergiliran satu per satu)
+      if (objects.length < MAX_OBJECTS && spawnTimer > nextSpawnDelay) {
         spawnObject();
         spawnTimer = 0;
+        // Generate delay random baru untuk spawn berikutnya (1-3 detik)
+        nextSpawnDelay = 1.0 + Math.random() * 2.0;
       }
       
       // PENTING: Pastikan SELALU ada object di depan kamera
@@ -1739,7 +1803,8 @@ export default function SpaceEnvironment() {
       
       if (!hasObjectNearby && objects.length < MAX_OBJECTS) {
         spawnObject();
-        spawnTimer = 0; // reset timer setelah spawn
+        spawnTimer = 0;
+        nextSpawnDelay = 1.0 + Math.random() * 2.0;
       }
 
       composer.render();
