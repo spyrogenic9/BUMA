@@ -1125,19 +1125,19 @@ export default function SpaceEnvironment() {
     // Kabut: offset (0, 8, -110) dari kamera (30 unit di belakang matahari)
     
     const FOG_OFFSET = new THREE.Vector3(0, 8, -110); // posisi kabut relatif terhadap kamera
-    const FOG_SPREAD_X = 120;  // penyebaran horizontal (2x lipat)
-    const FOG_SPREAD_Y = 80;   // penyebaran vertikal (2x lipat)
-    const FOG_SPREAD_Z = 40;   // penyebaran depth
+    const FOG_SPREAD_X = 156;  // penyebaran horizontal (1.3x dari 120)
+    const FOG_SPREAD_Y = 104;  // penyebaran vertikal (1.3x dari 80)
+    const FOG_SPREAD_Z = 50;   // penyebaran depth
     
     // Simpan original positions untuk animasi (relatif terhadap center kabut)
     const fogOriginalPositions = {
-      near: new Float32Array(800 * 3),
-      mid: new Float32Array(1000 * 3),
-      far: new Float32Array(1200 * 3)
+      near: new Float32Array(1200 * 3),
+      mid: new Float32Array(1500 * 3),
+      far: new Float32Array(2000 * 3)
     };
     
     // Layer 1: Kabut dekat matahari - partikel besar
-    const fogNearCount = 800;
+    const fogNearCount = 1200;  // lebih banyak partikel
     const fogNearPositions = new Float32Array(fogNearCount * 3);
     const fogNearColors = new Float32Array(fogNearCount * 3);
     
@@ -1166,7 +1166,7 @@ export default function SpaceEnvironment() {
       size: 20,
       vertexColors: true,
       transparent: true,
-      opacity: 0.08,
+      opacity: 0.24,  // 3x lebih tebal
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1179,7 +1179,7 @@ export default function SpaceEnvironment() {
     fogOriginalPositions.near.set(fogNearPositions);
     
     // Layer 2: Kabut menengah - partikel sedang
-    const fogMidCount = 1000;
+    const fogMidCount = 1500;  // lebih banyak partikel
     const fogMidPositions = new Float32Array(fogMidCount * 3);
     const fogMidColors = new Float32Array(fogMidCount * 3);
     
@@ -1208,7 +1208,7 @@ export default function SpaceEnvironment() {
       size: 15,
       vertexColors: true,
       transparent: true,
-      opacity: 0.06,
+      opacity: 0.18,  // 3x lebih tebal
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1221,7 +1221,7 @@ export default function SpaceEnvironment() {
     fogOriginalPositions.mid.set(fogMidPositions);
     
     // Layer 3: Kabut jauh - partikel kecil
-    const fogFarCount = 1200;
+    const fogFarCount = 2000;  // lebih banyak partikel
     const fogFarPositions = new Float32Array(fogFarCount * 3);
     const fogFarColors = new Float32Array(fogFarCount * 3);
     
@@ -1250,7 +1250,7 @@ export default function SpaceEnvironment() {
       size: 10,
       vertexColors: true,
       transparent: true,
-      opacity: 0.05,
+      opacity: 0.15,  // 3x lebih tebal
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -1274,17 +1274,15 @@ export default function SpaceEnvironment() {
     }
 
     const objects: SpaceObj[] = [];
-    const FADE_IN_FAR = 70;    // objek mulai terlihat dari jauh
-    const FADE_IN_NEAR = 35;   // objek terlihat jelas
-    const FADE_OUT_NEAR = 10;  // mulai pudar saat dekat kamera
-    const FADE_OUT_GONE = 3;   // hilang total
-    const REMOVE_DIST = 1;     // hapus dari scene
-    const SAFE_ZONE = 20;      // jarak aman dari kamera (diperbesar)
-    const MIN_SPAWN = 35;      // spawn jarak minimum (diperbesar)
-    const MAX_SPAWN = 65;      // spawn jarak maximum
-    const MAX_OBJECTS = 45;    // lebih banyak objek
-    const FADE_IN_DURATION = 3; // fade-in lebih cepat
-    const SUN_SAFE_DISTANCE = 35; // jarak aman dari matahari (diperbesar)
+    const FADE_IN_FAR = 100;   // objek mulai terlihat dari jauh
+    const FADE_IN_NEAR = 50;   // objek terlihat jelas
+    const FADE_OUT_NEAR = 15;  // mulai pudar saat dekat kamera
+    const FADE_OUT_GONE = 5;   // hilang total
+    const REMOVE_DIST = 2;     // hapus dari scene
+    const SAFE_ZONE = 15;      // jarak aman dari kamera
+    const SUN_SAFE_DISTANCE = 25; // jarak aman dari matahari
+    const MAX_OBJECTS = 50;    // lebih banyak objek
+    const FADE_IN_DURATION = 4; // fade-in duration
 
     function isPositionSafe(pos: THREE.Vector3, radius: number): boolean {
       const camDist = camera.position.distanceTo(pos);
@@ -1294,9 +1292,10 @@ export default function SpaceEnvironment() {
       const sunDist = pos.distanceTo(sun.position);
       if (sunDist < SUN_SAFE_DISTANCE + radius) return false;
       
+      // Cek tabrakan dengan objek lain
       for (const obj of objects) {
         const dist = pos.distanceTo(obj.mesh.position);
-        const minDist = radius + obj.radius + 4;
+        const minDist = radius + obj.radius + 3;
         if (dist < minDist) return false;
       }
       return true;
@@ -1361,17 +1360,14 @@ export default function SpaceEnvironment() {
 
       for (let attempt = 0; attempt < 20; attempt++) {
         // SPAWN DARI KABUT DI BELAKANG MATAHARI
-        // Kabut RELATIF terhadap kamera di offset (0, 8, -110)
-        // Spawn di area kabut: x = -60 sampai 60, y = -32 sampai 48, z = -90 sampai -150
-        
-        // Posisi relatif terhadap kamera
+        // Posisi RELATIF terhadap kamera (sama seperti kabut)
         const spawnOffsetX = (Math.random() - 0.5) * 120; // -60 sampai 60
-        const spawnOffsetY = (Math.random() - 0.5) * 80 + 8; // -32 sampai 48 (center di y=8)
-        const spawnOffsetZ = -90 - Math.random() * 60; // -90 sampai -150 (di belakang matahari)
+        const spawnOffsetY = (Math.random() - 0.5) * 80 + 8; // -32 sampai 48
+        const spawnOffsetZ = -95 - Math.random() * 50; // -95 sampai -145 (di belakang matahari)
 
-        // Konversi ke world space
+        // Konversi ke world space menggunakan orientasi kamera
         const spawnOffset = new THREE.Vector3(spawnOffsetX, spawnOffsetY, spawnOffsetZ);
-        const spawnWorldOffset = spawnOffset.applyQuaternion(camera.quaternion);
+        const spawnWorldOffset = spawnOffset.clone().applyQuaternion(camera.quaternion);
         spawnPos = camera.position.clone().add(spawnWorldOffset);
 
         if (isPositionSafe(spawnPos, radius)) {
@@ -1402,16 +1398,17 @@ export default function SpaceEnvironment() {
       );
       
       // Drift velocity - bergerak dari kabut menuju kamera
-      // Kecepatan relatif terhadap orientasi kamera
-      const driftSpeed = 1.2 + Math.random() * 0.8;
-      const driftLocal = new THREE.Vector3(
-        (Math.random() - 0.5) * 0.6,  // sedikit ke samping
-        (Math.random() - 0.5) * 0.3,  // sedikit ke atas/bawah
-        driftSpeed                     // bergerak ke depan (ke arah kamera)
-      );
+      // Arah dari spawn position ke kamera
+      const toCamera = camera.position.clone().sub(spawnPos).normalize();
+      const driftSpeed = 1.5 + Math.random() * 1.0;
       
-      // Konversi ke world space berdasarkan orientasi kamera
-      const driftVel = driftLocal.applyQuaternion(camera.quaternion);
+      // Tambahkan sedikit variasi ke samping dan atas/bawah
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+      const up = new THREE.Vector3(0, 1, 0);
+      
+      const driftVel = toCamera.multiplyScalar(driftSpeed)
+        .add(right.multiplyScalar((Math.random() - 0.5) * 0.5))
+        .add(up.multiplyScalar((Math.random() - 0.5) * 0.3));
 
       objects.push({ mesh, type, radius, rotSpeed, driftVel, age: 0, baseOpacity });
       return true;
