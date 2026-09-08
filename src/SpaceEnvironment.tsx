@@ -1,515 +1,607 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+
+type Mode = 'free' | 'auto';
+
+// Seeded random for reproducibility per chunk
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+function createAsteroidGeometry(size: number): THREE.BufferGeometry {
+  const geo = new THREE.IcosahedronGeometry(size, 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const noise = 0.6 + Math.random() * 0.8;
+    pos.setXYZ(i, x * noise, y * noise, z * noise);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function createRockMaterial(): THREE.MeshStandardMaterial {
+  const hue = 0.05 + Math.random() * 0.05;
+  const sat = 0.1 + Math.random() * 0.2;
+  const light = 0.15 + Math.random() * 0.2;
+  return new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(hue, sat, light),
+    roughness: 0.85 + Math.random() * 0.15,
+    metalness: 0.1 + Math.random() * 0.3,
+    flatShading: true,
+  });
+}
+
+function createNebulaParticles(count: number, spread: number): THREE.Points {
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+
+  const baseHue = Math.random();
+  const hueRange = 0.15;
+
+  for (let i = 0; i < count; i++) {
+    // Gaussian-like distribution for natural clustering
+    const r = spread * (Math.random() ** 0.5);
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.4;
+    positions[i * 3 + 2] = r * Math.cos(phi);
+
+    const hue = baseHue + (Math.random() - 0.5) * hueRange;
+    const color = new THREE.Color().setHSL(hue, 0.7 + Math.random() * 0.3, 0.4 + Math.random() * 0.3);
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+
+    sizes[i] = 0.5 + Math.random() * 2.5;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+  const mat = new THREE.PointsMaterial({
+    size: 1.5,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+
+  return new THREE.Points(geo, mat);
+}
+
+function createPlanet(): THREE.Group {
+  const group = new THREE.Group();
+  const radius = 3 + Math.random() * 8;
+
+  // Planet body
+  const planetGeo = new THREE.SphereGeometry(radius, 32, 32);
+  const hue = Math.random();
+  const planetMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(hue, 0.3 + Math.random() * 0.4, 0.2 + Math.random() * 0.3),
+    roughness: 0.7,
+    metalness: 0.1,
+  });
+
+  // Add surface variation
+  const pos = planetGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const len = Math.sqrt(x * x + y * y + z * z);
+    const noise = 1 + (Math.random() - 0.5) * 0.02;
+    pos.setXYZ(i, x / len * radius * noise, y / len * radius * noise, z / len * radius * noise);
+  }
+  planetGeo.computeVertexNormals();
+
+  const planet = new THREE.Mesh(planetGeo, planetMat);
+  group.add(planet);
+
+  // Atmosphere glow
+  const atmosGeo = new THREE.SphereGeometry(radius * 1.15, 32, 32);
+  const atmosMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color().setHSL(hue, 0.8, 0.5),
+    transparent: true,
+    opacity: 0.1,
+    side: THREE.BackSide,
+  });
+  group.add(new THREE.Mesh(atmosGeo, atmosMat));
+
+  // Ring (50% chance)
+  if (Math.random() > 0.5) {
+    const innerR = radius * 1.4;
+    const outerR = radius * 2.2;
+    const ringGeo = new THREE.RingGeometry(innerR, outerR, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color().setHSL(hue + 0.1, 0.3, 0.5),
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI * 0.4 + Math.random() * 0.3;
+    ring.rotation.z = Math.random() * 0.2;
+    group.add(ring);
+  }
+
+  return group;
+}
+
+function createSpaceDebris(): THREE.Group {
+  const group = new THREE.Group();
+  const count = 3 + Math.floor(Math.random() * 8);
+
+  for (let i = 0; i < count; i++) {
+    const size = 0.1 + Math.random() * 0.5;
+    const geo = createAsteroidGeometry(size);
+    const mat = createRockMaterial();
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(
+      (Math.random() - 0.5) * 10,
+      (Math.random() - 0.5) * 10,
+      (Math.random() - 0.5) * 10
+    );
+    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    group.add(mesh);
+  }
+
+  return group;
+}
+
+function createGlowingOrb(): THREE.Group {
+  const group = new THREE.Group();
+  const radius = 0.5 + Math.random() * 1.5;
+  const hue = Math.random();
+
+  const coreGeo = new THREE.SphereGeometry(radius, 16, 16);
+  const coreMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color().setHSL(hue, 1, 0.7),
+  });
+  group.add(new THREE.Mesh(coreGeo, coreMat));
+
+  // Outer glow
+  const glowGeo = new THREE.SphereGeometry(radius * 2, 16, 16);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color().setHSL(hue, 1, 0.5),
+    transparent: true,
+    opacity: 0.15,
+    side: THREE.BackSide,
+  });
+  group.add(new THREE.Mesh(glowGeo, glowMat));
+
+  // Point light
+  const light = new THREE.PointLight(
+    new THREE.Color().setHSL(hue, 1, 0.5),
+    2,
+    30
+  );
+  group.add(light);
+
+  return group;
+}
+
+function createStarField(count: number, spread: number): THREE.Points {
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * spread;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * spread;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * spread;
+
+    const temp = Math.random();
+    let r, g, b;
+    if (temp < 0.3) {
+      // Blue-white stars
+      r = 0.7 + Math.random() * 0.3;
+      g = 0.8 + Math.random() * 0.2;
+      b = 1;
+    } else if (temp < 0.6) {
+      // White stars
+      r = 1;
+      g = 1;
+      b = 0.9 + Math.random() * 0.1;
+    } else if (temp < 0.85) {
+      // Yellow stars
+      r = 1;
+      g = 0.9 + Math.random() * 0.1;
+      b = 0.6 + Math.random() * 0.2;
+    } else {
+      // Red stars
+      r = 1;
+      g = 0.4 + Math.random() * 0.3;
+      b = 0.2 + Math.random() * 0.2;
+    }
+    colors[i * 3] = r;
+    colors[i * 3 + 1] = g;
+    colors[i * 3 + 2] = b;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.3,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.9,
+    sizeAttenuation: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+
+  return new THREE.Points(geo, mat);
+}
 
 interface SpaceObject {
   mesh: THREE.Object3D;
-  velocity: THREE.Vector3;
+  type: string;
+  seed: number;
   rotationSpeed: THREE.Vector3;
-  originalOpacity: number;
   fadeStart: number;
   fadeEnd: number;
-  type: string;
 }
 
 export default function SpaceEnvironment() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<'free' | 'auto'>('auto');
-  const [showInstructions, setShowInstructions] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const modeRef = useRef<'free' | 'auto'>('auto');
+  const [mode, setMode] = useState<Mode>('auto');
+  const [isLocked, setIsLocked] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const modeRef = useRef<Mode>('auto');
   const keysRef = useRef<Set<string>>(new Set());
-  const mouseRef = useRef({ x: 0, y: 0, isLocked: false });
-  const velocityRef = useRef(new THREE.Vector3(0, 0, 0));
-  const eulerRef = useRef(new THREE.Euler(0, 0, 0, 'YXZ'));
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const objectsRef = useRef<SpaceObject[]>([]);
-  const starLayersRef = useRef<THREE.Points[]>([]);
-  const clockRef = useRef(new THREE.Clock());
-  const animFrameRef = useRef<number>(0);
-  const lastAutoYawRef = useRef(0);
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const velocityRef = useRef(new THREE.Vector3(0, 0, -0.3));
+  const targetVelocityRef = useRef(new THREE.Vector3(0, 0, -0.3));
 
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
-
-  const createStarLayer = useCallback((radius: number, count: number, size: number, opacity: number): THREE.Points => {
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-
-    for (let i = 0; i < count; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      const r = radius * (0.5 + Math.random() * 0.5);
-
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      positions[i * 3 + 2] = r * Math.cos(phi);
-
-      const colorChoice = Math.random();
-      if (colorChoice < 0.25) {
-        colors[i * 3] = 0.7 + Math.random() * 0.3;
-        colors[i * 3 + 1] = 0.8 + Math.random() * 0.2;
-        colors[i * 3 + 2] = 1.0;
-      } else if (colorChoice < 0.5) {
-        colors[i * 3] = 1.0;
-        colors[i * 3 + 1] = 0.9 + Math.random() * 0.1;
-        colors[i * 3 + 2] = 0.7 + Math.random() * 0.3;
-      } else if (colorChoice < 0.7) {
-        colors[i * 3] = 1.0;
-        colors[i * 3 + 1] = 0.6 + Math.random() * 0.2;
-        colors[i * 3 + 2] = 0.5 + Math.random() * 0.2;
-      } else {
-        const v = 0.85 + Math.random() * 0.15;
-        colors[i * 3] = v;
-        colors[i * 3 + 1] = v;
-        colors[i * 3 + 2] = v;
-      }
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const material = new THREE.PointsMaterial({
-      size,
-      vertexColors: true,
-      transparent: true,
-      opacity,
-      sizeAttenuation: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-
-    return new THREE.Points(geometry, material);
-  }, []);
-
-  const createNebula = useCallback((scene: THREE.Scene, position: THREE.Vector3): SpaceObject => {
-    const particleCount = 800;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(particleCount * 3);
-    const colors = new Float32Array(particleCount * 3);
-
-    const hue = Math.random();
-    const nebulaColor = new THREE.Color();
-    nebulaColor.setHSL(hue, 0.7, 0.5);
-
-    const spread = 25 + Math.random() * 40;
-    const centerOffset = new THREE.Vector3();
-
-    for (let i = 0; i < particleCount; i++) {
-      // Gaussian-like distribution
-      const r = spread * Math.pow(Math.random(), 0.5);
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-
-      positions[i * 3] = position.x + centerOffset.x + r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = position.y + centerOffset.y + r * Math.sin(phi) * Math.sin(theta) * 0.6;
-      positions[i * 3 + 2] = position.z + centerOffset.z + r * Math.cos(phi);
-
-      const colorVariation = new THREE.Color();
-      colorVariation.setHSL(
-        hue + (Math.random() - 0.5) * 0.15,
-        0.5 + Math.random() * 0.4,
-        0.3 + Math.random() * 0.4
-      );
-      colors[i * 3] = colorVariation.r;
-      colors[i * 3 + 1] = colorVariation.g;
-      colors[i * 3 + 2] = colorVariation.b;
-    }
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-    const material = new THREE.PointsMaterial({
-      size: 2.5 + Math.random() * 5,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.08 + Math.random() * 0.12,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true,
-    });
-
-    const nebula = new THREE.Points(geometry, material);
-    scene.add(nebula);
-
-    return {
-      mesh: nebula,
-      velocity: new THREE.Vector3(0, 0, 0),
-      rotationSpeed: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.0005,
-        (Math.random() - 0.5) * 0.0008,
-        (Math.random() - 0.5) * 0.0003
-      ),
-      originalOpacity: material.opacity,
-      fadeStart: 120,
-      fadeEnd: 280,
-      type: 'nebula',
-    };
-  }, []);
-
-  const createAsteroid = useCallback((scene: THREE.Scene, position: THREE.Vector3): SpaceObject => {
-    const size = 0.5 + Math.random() * 4;
-    const detail = Math.floor(Math.random() * 2) + 1;
-    const geometry = new THREE.IcosahedronGeometry(size, detail);
-
-    const posAttr = geometry.getAttribute('position');
-    for (let i = 0; i < posAttr.count; i++) {
-      const x = posAttr.getX(i);
-      const y = posAttr.getY(i);
-      const z = posAttr.getZ(i);
-      const noise = 0.6 + Math.random() * 0.8;
-      posAttr.setXYZ(i, x * noise, y * noise, z * noise);
-    }
-    geometry.computeVertexNormals();
-
-    const grayVal = 0.2 + Math.random() * 0.3;
-    const material = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(grayVal + 0.1, grayVal, grayVal - 0.05),
-      roughness: 0.85 + Math.random() * 0.15,
-      metalness: 0.05 + Math.random() * 0.2,
-      transparent: true,
-      opacity: 1.0,
-    });
-
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(position);
-    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-    scene.add(mesh);
-
-    return {
-      mesh,
-      velocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.008,
-        (Math.random() - 0.5) * 0.008,
-        (Math.random() - 0.5) * 0.008
-      ),
-      rotationSpeed: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.015,
-        (Math.random() - 0.5) * 0.015,
-        (Math.random() - 0.5) * 0.015
-      ),
-      originalOpacity: 1.0,
-      fadeStart: 80,
-      fadeEnd: 220,
-      type: 'asteroid',
-    };
-  }, []);
-
-  const createSpaceDebris = useCallback((scene: THREE.Scene, position: THREE.Vector3): SpaceObject => {
-    const group = new THREE.Group();
-    const pieceCount = 1 + Math.floor(Math.random() * 3);
-
-    for (let i = 0; i < pieceCount; i++) {
-      const geo = new THREE.BoxGeometry(
-        0.2 + Math.random() * 1.2,
-        0.1 + Math.random() * 0.6,
-        0.2 + Math.random() * 1.0
-      );
-
-      const metalness = 0.3 + Math.random() * 0.5;
-      const material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(0.3 + Math.random() * 0.4, 0.3 + Math.random() * 0.3, 0.3 + Math.random() * 0.3),
-        roughness: 0.4 + Math.random() * 0.3,
-        metalness,
-        transparent: true,
-        opacity: 1.0,
-      });
-
-      const piece = new THREE.Mesh(geo, material);
-      piece.position.set(
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 2
-      );
-      piece.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-      group.add(piece);
-    }
-
-    group.position.copy(position);
-    scene.add(group);
-
-    return {
-      mesh: group,
-      velocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.015,
-        (Math.random() - 0.5) * 0.015,
-        (Math.random() - 0.5) * 0.015
-      ),
-      rotationSpeed: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.03,
-        (Math.random() - 0.5) * 0.03,
-        (Math.random() - 0.5) * 0.03
-      ),
-      originalOpacity: 1.0,
-      fadeStart: 70,
-      fadeEnd: 180,
-      type: 'debris',
-    };
-  }, []);
-
-  const createGlowingOrb = useCallback((scene: THREE.Scene, position: THREE.Vector3): SpaceObject => {
-    const size = 0.8 + Math.random() * 2.5;
-    const hue = Math.random();
-    const color = new THREE.Color();
-    color.setHSL(hue, 0.8, 0.6);
-
-    const group = new THREE.Group();
-
-    // Core
-    const coreGeo = new THREE.SphereGeometry(size * 0.4, 16, 16);
-    const coreMat = new THREE.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.9,
-    });
-    const core = new THREE.Mesh(coreGeo, coreMat);
-    group.add(core);
-
-    // Inner glow
-    const innerGeo = new THREE.SphereGeometry(size * 0.8, 16, 16);
-    const innerMat = new THREE.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.3,
-      blending: THREE.AdditiveBlending,
-    });
-    const inner = new THREE.Mesh(innerGeo, innerMat);
-    group.add(inner);
-
-    // Outer glow
-    const outerGeo = new THREE.SphereGeometry(size * 1.5, 16, 16);
-    const outerMat = new THREE.MeshBasicMaterial({
-      color: color,
-      transparent: true,
-      opacity: 0.08,
-      blending: THREE.AdditiveBlending,
-      side: THREE.BackSide,
-    });
-    const outer = new THREE.Mesh(outerGeo, outerMat);
-    group.add(outer);
-
-    group.position.copy(position);
-    scene.add(group);
-
-    return {
-      mesh: group,
-      velocity: new THREE.Vector3(0, 0, 0),
-      rotationSpeed: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.005,
-        (Math.random() - 0.5) * 0.008,
-        (Math.random() - 0.5) * 0.003
-      ),
-      originalOpacity: 0.9,
-      fadeStart: 100,
-      fadeEnd: 250,
-      type: 'orb',
-    };
-  }, []);
-
-  const createSpaceStation = useCallback((scene: THREE.Scene, position: THREE.Vector3): SpaceObject => {
-    const group = new THREE.Group();
-
-    // Main body
-    const bodyGeo = new THREE.CylinderGeometry(1, 1, 6, 8);
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: 0x888899,
-      roughness: 0.4,
-      metalness: 0.7,
-      transparent: true,
-      opacity: 1.0,
-    });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    group.add(body);
-
-    // Ring
-    const ringGeo = new THREE.TorusGeometry(3, 0.3, 8, 24);
-    const ringMat = new THREE.MeshStandardMaterial({
-      color: 0x667788,
-      roughness: 0.3,
-      metalness: 0.8,
-      transparent: true,
-      opacity: 1.0,
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = Math.PI / 2;
-    group.add(ring);
-
-    // Solar panels
-    for (let i = 0; i < 4; i++) {
-      const panelGeo = new THREE.BoxGeometry(4, 0.05, 1.5);
-      const panelMat = new THREE.MeshStandardMaterial({
-        color: 0x2244aa,
-        roughness: 0.2,
-        metalness: 0.9,
-        transparent: true,
-        opacity: 1.0,
-      });
-      const panel = new THREE.Mesh(panelGeo, panelMat);
-      panel.rotation.y = (Math.PI / 2) * i;
-      panel.position.set(
-        Math.cos((Math.PI / 2) * i) * 2,
-        0,
-        Math.sin((Math.PI / 2) * i) * 2
-      );
-      group.add(panel);
-    }
-
-    // Lights
-    const lightGeo = new THREE.SphereGeometry(0.2, 8, 8);
-    const lightMat = new THREE.MeshBasicMaterial({
-      color: 0x44ff88,
-      transparent: true,
-      opacity: 1.0,
-    });
-    const light1 = new THREE.Mesh(lightGeo, lightMat);
-    light1.position.set(0, 3.2, 0);
-    group.add(light1);
-
-    const light2 = new THREE.Mesh(lightGeo.clone(), lightMat.clone());
-    light2.position.set(0, -3.2, 0);
-    group.add(light2);
-
-    group.position.copy(position);
-    group.scale.setScalar(1 + Math.random() * 0.5);
-    scene.add(group);
-
-    return {
-      mesh: group,
-      velocity: new THREE.Vector3(0, 0, 0),
-      rotationSpeed: new THREE.Vector3(0, 0.003 + Math.random() * 0.005, 0.001),
-      originalOpacity: 1.0,
-      fadeStart: 100,
-      fadeEnd: 250,
-      type: 'station',
-    };
-  }, []);
-
-  const spawnObjectsAroundCamera = useCallback((camera: THREE.Camera, scene: THREE.Scene) => {
-    const camPos = camera.position.clone();
-    const spawnRadius = 250;
-    const minDist = 40;
-
-    const objectCount = 8 + Math.floor(Math.random() * 8);
-
-    for (let i = 0; i < objectCount; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      const r = minDist + Math.random() * (spawnRadius - minDist);
-
-      const pos = new THREE.Vector3(
-        camPos.x + r * Math.sin(phi) * Math.cos(theta),
-        camPos.y + r * Math.sin(phi) * Math.sin(theta),
-        camPos.z + r * Math.cos(phi)
-      );
-
-      const type = Math.random();
-      let obj: SpaceObject;
-
-      if (type < 0.25) {
-        obj = createNebula(scene, pos);
-      } else if (type < 0.45) {
-        obj = createAsteroid(scene, pos);
-      } else if (type < 0.6) {
-        obj = createSpaceDebris(scene, pos);
-      } else if (type < 0.8) {
-        obj = createGlowingOrb(scene, pos);
-      } else {
-        obj = createSpaceStation(scene, pos);
-      }
-
-      objectsRef.current.push(obj);
-    }
-  }, [createNebula, createAsteroid, createSpaceDebris, createGlowingOrb, createSpaceStation]);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     // Scene setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000008);
-    scene.fog = new THREE.FogExp2(0x000008, 0.0035);
-    sceneRef.current = scene;
+    scene.background = new THREE.Color(0x020208);
+
+    // Dense fog for natural fade-in/out
+    const fogColor = new THREE.Color(0x020208);
+    scene.fog = new THREE.FogExp2(fogColor, 0.008);
 
     // Camera
     const camera = new THREE.PerspectiveCamera(
       70,
       window.innerWidth / window.innerHeight,
       0.1,
-      1500
+      1000
     );
     camera.position.set(0, 0, 0);
-    cameraRef.current = camera;
 
     // Renderer
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: false,
-      powerPreference: 'high-performance',
     });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
     containerRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
 
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0x111122, 0.8);
+    const ambientLight = new THREE.AmbientLight(0x111122, 0.5);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xffeedd, 1.0);
-    sunLight.position.set(100, 50, -100);
-    scene.add(sunLight);
+    const dirLight = new THREE.DirectionalLight(0xffeedd, 0.8);
+    dirLight.position.set(50, 30, -50);
+    scene.add(dirLight);
 
-    const fillLight = new THREE.DirectionalLight(0x4466aa, 0.3);
-    fillLight.position.set(-50, -30, 50);
-    scene.add(fillLight);
+    const dirLight2 = new THREE.DirectionalLight(0x4466aa, 0.3);
+    dirLight2.position.set(-30, -20, 30);
+    scene.add(dirLight2);
 
-    // Create multiple star layers for infinite depth
-    const layer1 = createStarLayer(500, 5000, 1.5, 0.9);
-    const layer2 = createStarLayer(350, 3000, 2.0, 0.7);
-    const layer3 = createStarLayer(200, 1500, 3.0, 0.5);
-    
-    scene.add(layer1);
-    scene.add(layer2);
-    scene.add(layer3);
-    starLayersRef.current = [layer1, layer2, layer3];
+    // Star layers that follow camera
+    const starLayers: THREE.Points[] = [];
+    for (let i = 0; i < 3; i++) {
+      const spread = 300 + i * 200;
+      const count = 2000 - i * 500;
+      const stars = createStarField(count, spread);
+      scene.add(stars);
+      starLayers.push(stars);
+    }
 
-    // Create initial objects
-    spawnObjectsAroundCamera(camera, scene);
+    // Space objects management
+    const spaceObjects: SpaceObject[] = [];
+    const SPAWN_RADIUS = 150;
+    const DESPAWN_RADIUS = 180;
+    const FADE_START = 80;
+    const FADE_END = 150;
+    let chunkSeed = 12345;
+    let lastSpawnZ = 0;
 
-    // Set loading to false after a short delay
-    setTimeout(() => setIsLoading(false), 500);
+    function spawnObject(forward: boolean) {
+      const rng = seededRandom(chunkSeed++);
+      const typeRoll = rng();
+
+      let mesh: THREE.Object3D;
+      let type: string;
+
+      if (typeRoll < 0.35) {
+        // Asteroid cluster
+        type = 'asteroid';
+        const count = 1 + Math.floor(rng() * 5);
+        const group = new THREE.Group();
+        for (let i = 0; i < count; i++) {
+          const size = 0.5 + rng() * 3;
+          const geo = createAsteroidGeometry(size);
+          const mat = createRockMaterial();
+          const m = new THREE.Mesh(geo, mat);
+          m.position.set(
+            (rng() - 0.5) * 15,
+            (rng() - 0.5) * 15,
+            (rng() - 0.5) * 15
+          );
+          m.rotation.set(rng() * Math.PI * 2, rng() * Math.PI * 2, rng() * Math.PI * 2);
+          group.add(m);
+        }
+        mesh = group;
+      } else if (typeRoll < 0.5) {
+        // Nebula
+        type = 'nebula';
+        const count = 200 + Math.floor(rng() * 400);
+        const spread = 15 + rng() * 25;
+        mesh = createNebulaParticles(count, spread);
+      } else if (typeRoll < 0.6) {
+        // Planet
+        type = 'planet';
+        mesh = createPlanet();
+      } else if (typeRoll < 0.75) {
+        // Space debris
+        type = 'debris';
+        mesh = createSpaceDebris();
+      } else if (typeRoll < 0.88) {
+        // Glowing orb
+        type = 'orb';
+        mesh = createGlowingOrb();
+      } else {
+        // Large asteroid
+        type = 'asteroid';
+        const size = 3 + rng() * 8;
+        const geo = createAsteroidGeometry(size);
+        const mat = createRockMaterial();
+        mesh = new THREE.Mesh(geo, mat);
+      }
+
+      // Position: spread around but biased forward
+      const angle = rng() * Math.PI * 2;
+      const dist = 30 + rng() * (SPAWN_RADIUS - 30);
+      const zOffset = forward ? (80 + rng() * 70) : (-80 - rng() * 70);
+
+      mesh.position.set(
+        Math.cos(angle) * dist * 0.6,
+        (rng() - 0.5) * dist * 0.4,
+        camera.position.z + zOffset
+      );
+
+      // Random rotation
+      mesh.rotation.set(
+        rng() * Math.PI * 2,
+        rng() * Math.PI * 2,
+        rng() * Math.PI * 2
+      );
+
+      // Start invisible for fade-in
+      mesh.traverse((child) => {
+        if ((child as THREE.Mesh).material) {
+          const mat = (child as THREE.Mesh).material;
+          if (Array.isArray(mat)) {
+            mat.forEach(m => { m.transparent = true; m.opacity = 0; });
+          } else {
+            (mat as THREE.Material & { opacity: number }).transparent = true;
+            (mat as THREE.Material & { opacity: number }).opacity = 0;
+          }
+        }
+      });
+
+      scene.add(mesh);
+
+      const rotSpeed = new THREE.Vector3(
+        (rng() - 0.5) * 0.005,
+        (rng() - 0.5) * 0.005,
+        (rng() - 0.5) * 0.003
+      );
+
+      spaceObjects.push({
+        mesh,
+        type,
+        seed: chunkSeed - 1,
+        rotationSpeed: rotSpeed,
+        fadeStart: FADE_START,
+        fadeEnd: FADE_END,
+      });
+    }
+
+    // Initial spawn
+    for (let i = 0; i < 40; i++) {
+      spawnObject(i % 2 === 0);
+    }
+
+    // Euler for camera rotation
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+    let pitchAngle = 0;
+    let yawAngle = 0;
+
+    // Animation
+    const clock = new THREE.Clock();
+    let animationId: number;
+
+    function animate() {
+      animationId = requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.getElapsedTime();
+
+      const currentMode = modeRef.current;
+
+      // Camera movement
+      if (currentMode === 'auto') {
+        // Only move forward slowly
+        targetVelocityRef.current.set(0, 0, -0.8);
+
+        // Very subtle random drift for natural feel
+        const driftX = Math.sin(elapsed * 0.1) * 0.02;
+        const driftY = Math.cos(elapsed * 0.07) * 0.01;
+        euler.y -= driftX * delta;
+        euler.x -= driftY * delta;
+        euler.x = Math.max(-0.1, Math.min(0.1, euler.x));
+      } else {
+        // Free mode - smooth forward movement with mouse look
+        const speed = keysRef.current.has('shift') ? 3 : 1.2;
+        const boost = keysRef.current.has('e') ? 2.5 : 1;
+        const slow = keysRef.current.has('q') ? 0.3 : 1;
+
+        targetVelocityRef.current.set(0, 0, -speed * boost * slow);
+
+        // Mouse look
+        euler.y -= mouseRef.current.x * 0.002;
+        euler.x -= mouseRef.current.y * 0.002;
+        euler.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, euler.x));
+        mouseRef.current.x = 0;
+        mouseRef.current.y = 0;
+      }
+
+      // Smooth velocity lerp
+      velocityRef.current.lerp(targetVelocityRef.current, delta * 3);
+
+      // Apply rotation
+      camera.quaternion.setFromEuler(euler);
+
+      // Move camera in local space
+      const moveVec = velocityRef.current.clone().applyQuaternion(camera.quaternion);
+      camera.position.add(moveVec);
+
+      // Update star layers to follow camera
+      starLayers.forEach((layer, i) => {
+        layer.position.copy(camera.position);
+        // Subtle rotation for parallax
+        layer.rotation.y = elapsed * 0.002 * (i + 1);
+        layer.rotation.x = elapsed * 0.001 * (i + 1);
+      });
+
+      // Update space objects
+      const camPos = camera.position;
+
+      for (let i = spaceObjects.length - 1; i >= 0; i--) {
+        const obj = spaceObjects[i];
+        const dist = obj.mesh.position.distanceTo(camPos);
+
+        // Despawn if too far
+        if (dist > DESPAWN_RADIUS) {
+          scene.remove(obj.mesh);
+          // Dispose geometry and materials
+          obj.mesh.traverse((child) => {
+            if ((child as THREE.Mesh).geometry) {
+              (child as THREE.Mesh).geometry.dispose();
+            }
+            if ((child as THREE.Mesh).material) {
+              const mat = (child as THREE.Mesh).material;
+              if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+              else mat.dispose();
+            }
+          });
+          spaceObjects.splice(i, 1);
+          continue;
+        }
+
+        // Smooth fade based on distance
+        let targetOpacity = 1;
+        if (dist > obj.fadeEnd) {
+          targetOpacity = 0;
+        } else if (dist > obj.fadeStart) {
+          const t = (dist - obj.fadeStart) / (obj.fadeEnd - obj.fadeStart);
+          // Smooth easing
+          targetOpacity = 1 - t * t;
+        } else if (dist < 15) {
+          // Also fade if very close (passed through)
+          targetOpacity = dist / 15;
+        }
+
+        // Apply opacity smoothly
+        obj.mesh.traverse((child) => {
+          if ((child as THREE.Mesh).material) {
+            const mat = (child as THREE.Mesh).material;
+            const mats = Array.isArray(mat) ? mat : [mat];
+            mats.forEach(m => {
+              const mAny = m as THREE.Material & { opacity: number };
+              mAny.transparent = true;
+              // Smooth lerp for opacity
+              mAny.opacity += (targetOpacity - mAny.opacity) * delta * 4;
+            });
+          }
+        });
+
+        // Rotation
+        obj.mesh.rotation.x += obj.rotationSpeed.x;
+        obj.mesh.rotation.y += obj.rotationSpeed.y;
+        obj.mesh.rotation.z += obj.rotationSpeed.z;
+
+        // Nebula slow rotation
+        if (obj.type === 'nebula') {
+          obj.mesh.rotation.y += 0.001;
+        }
+      }
+
+      // Spawn new objects to maintain density
+      while (spaceObjects.length < 35) {
+        spawnObject(Math.random() > 0.3);
+      }
+
+      // Also spawn ahead of camera
+      if (Math.random() < 0.02) {
+        spawnObject(true);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Start
+    setTimeout(() => setLoading(false), 800);
+    animate();
 
     // Event handlers
-    const handleKeyDown = (e: KeyboardEvent) => {
-      keysRef.current.add(e.code);
-      if (e.code === 'Tab') {
-        e.preventDefault();
-        setMode(prev => {
-          const newMode = prev === 'free' ? 'auto' : 'free';
-          if (newMode === 'auto' && document.pointerLockElement) {
-            document.exitPointerLock();
-          }
-          return newMode;
-        });
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      keysRef.current.delete(e.code);
+    const handleResize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (document.pointerLockElement === renderer.domElement) {
-        mouseRef.current.isLocked = true;
-        eulerRef.current.y -= e.movementX * 0.002;
-        eulerRef.current.x -= e.movementY * 0.002;
-        eulerRef.current.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, eulerRef.current.x));
+        mouseRef.current.x += e.movementX;
+        mouseRef.current.y += e.movementY;
       }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keysRef.current.add(e.key.toLowerCase());
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keysRef.current.delete(e.key.toLowerCase());
     };
 
     const handleClick = () => {
@@ -519,337 +611,137 @@ export default function SpaceEnvironment() {
     };
 
     const handlePointerLockChange = () => {
-      mouseRef.current.isLocked = document.pointerLockElement === renderer.domElement;
+      setIsLocked(document.pointerLockElement === renderer.domElement);
     };
 
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('mousemove', handleMouseMove);
     renderer.domElement.addEventListener('click', handleClick);
     document.addEventListener('pointerlockchange', handlePointerLockChange);
-    window.addEventListener('resize', handleResize);
-
-    // Animation loop
-    let lastSpawnTime = 0;
-    const spawnInterval = 2500;
-    let smoothVelocity = new THREE.Vector3(0, 0, 0);
-
-    const animate = () => {
-      animFrameRef.current = requestAnimationFrame(animate);
-      const delta = Math.min(clockRef.current.getDelta(), 0.05);
-      const elapsed = clockRef.current.getElapsedTime();
-
-      // Update camera rotation
-      camera.rotation.copy(eulerRef.current);
-
-      // Movement based on mode
-      if (modeRef.current === 'free') {
-        const speed = 35;
-        const targetVelocity = new THREE.Vector3();
-
-        if (keysRef.current.has('KeyW') || keysRef.current.has('ArrowUp')) targetVelocity.z -= 1;
-        if (keysRef.current.has('KeyS') || keysRef.current.has('ArrowDown')) targetVelocity.z += 1;
-        if (keysRef.current.has('KeyA') || keysRef.current.has('ArrowLeft')) targetVelocity.x -= 1;
-        if (keysRef.current.has('KeyD') || keysRef.current.has('ArrowRight')) targetVelocity.x += 1;
-        if (keysRef.current.has('Space')) targetVelocity.y += 1;
-        if (keysRef.current.has('ShiftLeft') || keysRef.current.has('ShiftRight')) targetVelocity.y -= 1;
-
-        targetVelocity.normalize();
-        targetVelocity.applyQuaternion(camera.quaternion);
-
-        let currentSpeed = speed;
-        if (keysRef.current.has('KeyE')) currentSpeed *= 3;
-        if (keysRef.current.has('KeyQ')) currentSpeed *= 0.3;
-
-        targetVelocity.multiplyScalar(currentSpeed * delta);
-
-        // Smooth velocity transition
-        smoothVelocity.lerp(targetVelocity, 0.1);
-        camera.position.add(smoothVelocity);
-
-      } else {
-        // Auto mode - smooth forward movement with gentle wandering
-        const autoSpeed = 12;
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-
-        // Gentle wandering
-        const wanderSpeed = 0.15;
-        lastAutoYawRef.current += Math.sin(elapsed * wanderSpeed) * 0.0004;
-        lastAutoYawRef.current += Math.cos(elapsed * wanderSpeed * 0.7) * 0.0002;
-        
-        eulerRef.current.y = lastAutoYawRef.current + Math.sin(elapsed * 0.05) * 0.3;
-        eulerRef.current.x = Math.sin(elapsed * 0.03) * 0.1;
-
-        const moveDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-        const moveAmount = moveDir.multiplyScalar(autoSpeed * delta);
-        
-        smoothVelocity.lerp(moveAmount, 0.05);
-        camera.position.add(smoothVelocity);
-      }
-
-      // Update star layers - keep them centered on camera for infinite effect
-      for (const layer of starLayersRef.current) {
-        const dist = layer.position.distanceTo(camera.position);
-        if (dist > 50) {
-          layer.position.copy(camera.position);
-        }
-        // Subtle rotation for parallax
-        layer.rotation.y += 0.00003;
-        layer.rotation.x += 0.00001;
-      }
-
-      // Update objects
-      const camPos = camera.position;
-      const toRemove: number[] = [];
-
-      for (let i = 0; i < objectsRef.current.length; i++) {
-        const obj = objectsRef.current[i];
-        const dist = obj.mesh.position.distanceTo(camPos);
-
-        // Fade objects based on distance
-        if (dist > obj.fadeStart) {
-          const fadeProgress = Math.min(1, (dist - obj.fadeStart) / (obj.fadeEnd - obj.fadeStart));
-          const easedFade = fadeProgress * fadeProgress; // Quadratic easing for smoother fade
-
-          // Traverse and update all materials
-          obj.mesh.traverse((child) => {
-            if (child instanceof THREE.Mesh || child instanceof THREE.Points) {
-              const mat = child.material as THREE.Material;
-              if (mat && 'opacity' in mat) {
-                (mat as THREE.MeshBasicMaterial).opacity = obj.originalOpacity * (1 - easedFade);
-              }
-            }
-          });
-        }
-
-        // Remove objects that are too far
-        if (dist > obj.fadeEnd + 80) {
-          toRemove.push(i);
-          scene.remove(obj.mesh);
-          obj.mesh.traverse((child) => {
-            if (child instanceof THREE.Mesh || child instanceof THREE.Points) {
-              child.geometry?.dispose();
-              if (Array.isArray(child.material)) {
-                child.material.forEach(m => m.dispose());
-              } else {
-                child.material?.dispose();
-              }
-            }
-          });
-        }
-
-        // Rotate objects
-        obj.mesh.rotation.x += obj.rotationSpeed.x;
-        obj.mesh.rotation.y += obj.rotationSpeed.y;
-        obj.mesh.rotation.z += obj.rotationSpeed.z;
-
-        // Move objects slightly
-        obj.mesh.position.add(obj.velocity.clone().multiplyScalar(delta * 60));
-
-        // Pulsing effect for orbs
-        if (obj.type === 'orb') {
-          const pulse = 0.8 + Math.sin(elapsed * 2 + i) * 0.2;
-          obj.mesh.scale.setScalar(pulse);
-        }
-      }
-
-      // Remove far objects
-      for (let i = toRemove.length - 1; i >= 0; i--) {
-        objectsRef.current.splice(toRemove[i], 1);
-      }
-
-      // Spawn new objects periodically
-      const now = Date.now();
-      if (now - lastSpawnTime > spawnInterval) {
-        lastSpawnTime = now;
-        if (objectsRef.current.length < 50) {
-          spawnObjectsAroundCamera(camera, scene);
-        }
-      }
-
-      // Update fog density based on mode
-      const targetFogDensity = modeRef.current === 'auto' ? 0.004 : 0.003;
-      const currentFog = scene.fog as THREE.FogExp2;
-      currentFog.density += (targetFogDensity - currentFog.density) * 0.01;
-
-      renderer.render(scene, camera);
-    };
-
-    animate();
 
     return () => {
-      cancelAnimationFrame(animFrameRef.current);
+      cancelAnimationFrame(animationId);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      window.removeEventListener('mousemove', handleMouseMove);
       renderer.domElement.removeEventListener('click', handleClick);
       document.removeEventListener('pointerlockchange', handlePointerLockChange);
-      window.removeEventListener('resize', handleResize);
+
+      // Cleanup
+      spaceObjects.forEach(obj => {
+        obj.mesh.traverse((child) => {
+          if ((child as THREE.Mesh).geometry) (child as THREE.Mesh).geometry.dispose();
+          if ((child as THREE.Mesh).material) {
+            const mat = (child as THREE.Mesh).material;
+            if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+            else mat.dispose();
+          }
+        });
+      });
+      starLayers.forEach(s => {
+        s.geometry.dispose();
+        (s.material as THREE.Material).dispose();
+      });
       renderer.dispose();
-      if (containerRef.current && renderer.domElement.parentNode === containerRef.current) {
+      if (containerRef.current?.contains(renderer.domElement)) {
         containerRef.current.removeChild(renderer.domElement);
       }
     };
-  }, [createStarLayer, spawnObjectsAroundCamera]);
-
-  const toggleMode = () => {
-    setMode(prev => {
-      const newMode = prev === 'free' ? 'auto' : 'free';
-      if (newMode === 'auto' && document.pointerLockElement) {
-        document.exitPointerLock();
-      }
-      if (newMode === 'auto') {
-        lastAutoYawRef.current = eulerRef.current.y;
-      }
-      return newMode;
-    });
-  };
+  }, []);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
+    <div className="w-full h-screen relative overflow-hidden bg-black">
+      <div ref={containerRef} className="w-full h-full" />
+
+      {/* Vignette overlay */}
+      <div className="vignette" />
+
       {/* Loading screen */}
-      {isLoading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black">
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#020208]">
           <div className="text-center">
-            <div className="w-16 h-16 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-white/60 text-sm">Initializing Space...</p>
-          </div>
-        </div>
-      )}
-
-      <div ref={containerRef} className="absolute inset-0" />
-
-      {/* UI Overlay */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start pointer-events-none z-10">
-        {/* Mode toggle */}
-        <div className="pointer-events-auto flex flex-col gap-2">
-          <button
-            onClick={toggleMode}
-            className="px-5 py-2.5 rounded-xl backdrop-blur-xl border border-white/20 text-white font-medium transition-all duration-300 hover:bg-white/10 hover:border-white/40 hover:scale-105 active:scale-95"
-            style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
-          >
-            <span className="flex items-center gap-2">
-              {mode === 'free' ? (
-                <>
-                  <span className="text-lg">🎮</span>
-                  <span>Free Mode</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-lg">🚀</span>
-                  <span>Auto Pilot</span>
-                </>
-              )}
-            </span>
-          </button>
-          <span className="text-white/30 text-xs text-center">Press TAB to switch</span>
-        </div>
-
-        {/* Help toggle */}
-        <div className="pointer-events-auto">
-          <button
-            onClick={() => setShowInstructions(!showInstructions)}
-            className="w-10 h-10 rounded-xl backdrop-blur-xl border border-white/20 text-white/80 flex items-center justify-center transition-all duration-300 hover:bg-white/10 hover:border-white/40"
-            style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
-          >
-            {showInstructions ? '✕' : '?'}
-          </button>
-        </div>
-      </div>
-
-      {/* Instructions panel */}
-      {showInstructions && (
-        <div
-          className="absolute bottom-8 left-8 p-5 rounded-2xl backdrop-blur-xl border border-white/10 text-white/80 text-sm max-w-xs pointer-events-auto z-10 animate-fadeIn"
-          style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-        >
-          <h3 className="text-white font-bold mb-3 text-lg flex items-center gap-2">
-            <span>🌌</span> Space Explorer
-          </h3>
-          {mode === 'free' ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-xs font-mono">W A S D</kbd>
-                <span className="text-white/60">Move</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-xs font-mono">Mouse</kbd>
-                <span className="text-white/60">Look (click to lock)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-xs font-mono">Space</kbd>
-                <span className="text-white/60">Move up</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-xs font-mono">Shift</kbd>
-                <span className="text-white/60">Move down</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-xs font-mono">E</kbd>
-                <span className="text-white/60">Boost</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <kbd className="px-2 py-0.5 rounded bg-white/10 border border-white/20 text-xs font-mono">Q</kbd>
-                <span className="text-white/60">Slow down</span>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="flex items-center gap-2">
-                <span className="text-green-400">●</span> Auto-pilot engaged
-              </p>
-              <p className="text-white/50">Drifting through the infinite cosmos...</p>
-              <p className="text-white/50">Objects fade into cosmic fog</p>
-            </div>
-          )}
-          <div className="mt-4 pt-3 border-t border-white/10">
-            <p className="text-white/40 text-xs">
-              Environment loops infinitely • Objects are randomly generated
+            <div className="spinner mb-6" />
+            <p className="text-white/70 text-lg tracking-widest uppercase">
+              Memuat Lingkungan Luar Angkasa...
             </p>
           </div>
         </div>
       )}
 
-      {/* Crosshair for free mode */}
-      {mode === 'free' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <div className="relative">
-            <div className="w-5 h-5 border border-white/30 rounded-full" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-1 h-1 rounded-full bg-white/50" />
+      {/* UI Overlay */}
+      <div className="fixed top-0 left-0 right-0 z-30 pointer-events-none">
+        <div className="flex justify-between items-start p-4 md:p-6">
+          {/* Mode toggle */}
+          <div className="pointer-events-auto">
+            <div className="glass-panel px-4 py-3 rounded-xl">
+              <p className="text-white/50 text-[10px] uppercase tracking-[0.2em] mb-2">Mode Perjalanan</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMode('auto')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                    mode === 'auto'
+                      ? 'bg-blue-500/30 text-blue-300 border border-blue-400/40 shadow-lg shadow-blue-500/10'
+                      : 'text-white/40 hover:text-white/70 border border-transparent'
+                  }`}
+                >
+                  <span className="mr-1.5">🚀</span>Otomatis
+                </button>
+                <button
+                  onClick={() => setMode('free')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                    mode === 'free'
+                      ? 'bg-purple-500/30 text-purple-300 border border-purple-400/40 shadow-lg shadow-purple-500/10'
+                      : 'text-white/40 hover:text-white/70 border border-transparent'
+                  }`}
+                >
+                  <span className="mr-1.5">🎮</span>Bebas
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Status */}
+          <div className="pointer-events-auto">
+            <div className="glass-panel px-4 py-3 rounded-xl text-right">
+              <p className="text-white/50 text-[10px] uppercase tracking-[0.2em] mb-1">Status</p>
+              <p className="text-white/80 text-sm">
+                {mode === 'auto' ? '🌌 Menjelajah Otomatis' : isLocked ? '🎯 Kontrol Aktif' : '👆 Klik untuk Kontrol'}
+              </p>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Bottom status bar */}
-      <div className="absolute bottom-4 right-4 pointer-events-none z-10">
-        <div
-          className="px-4 py-2 rounded-full text-xs text-white/50 backdrop-blur-sm border border-white/10 flex items-center gap-3"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-        >
-          <span className="flex items-center gap-1.5">
-            <span className={`w-1.5 h-1.5 rounded-full ${mode === 'free' ? 'bg-blue-400' : 'bg-green-400'} animate-pulse`} />
-            {mode === 'free' ? 'Free Navigation' : 'Auto Pilot'}
-          </span>
-          <span className="text-white/20">|</span>
-          <span>Fog: Active</span>
+      {/* Controls help */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
+        <div className="flex justify-center p-4 md:p-6">
+          <div className="glass-panel px-5 py-3 rounded-xl">
+            {mode === 'auto' ? (
+              <p className="text-white/50 text-xs text-center tracking-wide">
+                ✨ Menjelajah otomatis melalui ruang angkasa tanpa batas — duduk dan nikmati pemandangannya
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-x-5 gap-y-1 justify-center text-white/50 text-xs">
+                <span><kbd className="key">Mouse</kbd> Lihat sekitar</span>
+                <span><kbd className="key">Shift</kbd> Cepat</span>
+                <span><kbd className="key">E</kbd> Boost</span>
+                <span><kbd className="key">Q</kbd> Lambat</span>
+                <span><kbd className="key">Esc</kbd> Keluar</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Vignette effect */}
-      <div
-        className="absolute inset-0 pointer-events-none z-5"
-        style={{
-          background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%)',
-        }}
-      />
+      {/* Crosshair for free mode */}
+      {mode === 'free' && isLocked && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center pointer-events-none">
+          <div className="w-1.5 h-1.5 rounded-full bg-white/40 shadow-lg shadow-white/20" />
+        </div>
+      )}
     </div>
   );
 }
