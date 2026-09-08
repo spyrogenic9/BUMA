@@ -916,85 +916,249 @@ function createWreck(): THREE.Group {
   return group;
 }
 
-// ====== MATAHARI - ultra realistis dengan corona detail ======
+// ====== MATAHARI - ultra natural dengan permukaan bergejolak ======
 function createSun(): THREE.Group {
   const group = new THREE.Group();
   
-  // Inti matahari - putih super terang dengan emissive tinggi
-  const sunGeo = new THREE.SphereGeometry(3.5, 64, 64);
+  // ====== 1. INTI MATAHARI - permukaan tidak sempurna, bergejolak ======
+  const sunGeo = new THREE.SphereGeometry(3, 96, 96);
+  const sunPos = sunGeo.attributes.position;
+  
+  // Displacement untuk permukaan yang "hidup" dan tidak rata
+  for (let i = 0; i < sunPos.count; i++) {
+    const x = sunPos.getX(i);
+    const y = sunPos.getY(i);
+    const z = sunPos.getZ(i);
+    const len = Math.sqrt(x * x + y * y + z * z);
+    const nx = x / len, ny = y / len, nz = z / len;
+    
+    // Multi-octave noise untuk granulasi permukaan
+    const n1 = Math.sin(nx * 8 + ny * 6) * 0.03;
+    const n2 = Math.cos(ny * 12 + nz * 9) * 0.02;
+    const n3 = Math.sin(nz * 15 + nx * 7) * 0.015;
+    const n4 = (Math.random() - 0.5) * 0.02;
+    const displacement = 1 + n1 + n2 + n3 + n4;
+    
+    sunPos.setXYZ(i, nx * 3 * displacement, ny * 3 * displacement, nz * 3 * displacement);
+  }
+  sunGeo.computeVertexNormals();
+  
+  // Warna inti: putih super terang dengan sedikit kuning
   const sunMat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
+    color: 0xfffff5,
   });
   const sun = new THREE.Mesh(sunGeo, sunMat);
   group.add(sun);
   
-  // Photosphere - lapisan dalam dengan tekstur
-  const photoGeo = new THREE.SphereGeometry(4.2, 64, 64);
+  // ====== 2. PHOTOSPHERE - lapisan granulasi ======
+  const photoGeo = new THREE.SphereGeometry(3.3, 64, 64);
+  const photoPos = photoGeo.attributes.position;
+  for (let i = 0; i < photoPos.count; i++) {
+    const x = photoPos.getX(i);
+    const y = photoPos.getY(i);
+    const z = photoPos.getZ(i);
+    const len = Math.sqrt(x * x + y * y + z * z);
+    const nx = x / len, ny = y / len, nz = z / len;
+    const noise = 1 + Math.sin(nx * 10 + ny * 8) * 0.04 + Math.cos(nz * 12) * 0.03;
+    photoPos.setXYZ(i, nx * 3.3 * noise, ny * 3.3 * noise, nz * 3.3 * noise);
+  }
+  photoGeo.computeVertexNormals();
+  
   const photoMat = new THREE.MeshBasicMaterial({
-    color: 0xffffdd,
+    color: 0xfffacd,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.7,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  const photo = new THREE.Mesh(photoGeo, photoMat);
-  group.add(photo);
+  group.add(new THREE.Mesh(photoGeo, photoMat));
   
-  // Corona inner - panas intens
-  const corona1Geo = new THREE.SphereGeometry(5.5, 48, 48);
-  const corona1Mat = new THREE.MeshBasicMaterial({
-    color: 0xffee88,
+  // ====== 3. CHROMOSPHERE - warna transisi ======
+  const chromoGeo = new THREE.SphereGeometry(3.8, 48, 48);
+  const chromoMat = new THREE.MeshBasicMaterial({
+    color: 0xffdd77,
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.45,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  const corona1 = new THREE.Mesh(corona1Geo, corona1Mat);
-  group.add(corona1);
+  group.add(new THREE.Mesh(chromoGeo, chromoMat));
   
-  // Corona mid - transisi warna
-  const corona2Geo = new THREE.SphereGeometry(7.5, 48, 48);
-  const corona2Mat = new THREE.MeshBasicMaterial({
-    color: 0xffcc44,
+  // ====== 4. CORONA - tidak simetris, menggunakan noise ======
+  const coronaLayers = [
+    { radius: 4.8, color: 0xffcc55, opacity: 0.4 },
+    { radius: 6.2, color: 0xffaa33, opacity: 0.28 },
+    { radius: 8.5, color: 0xff8811, opacity: 0.16 },
+    { radius: 12, color: 0xff6600, opacity: 0.08 },
+    { radius: 17, color: 0xff4400, opacity: 0.035 },
+  ];
+  
+  coronaLayers.forEach((layer) => {
+    const geo = new THREE.SphereGeometry(layer.radius, 48, 48);
+    const pos = geo.attributes.position;
+    
+    // Noise untuk corona yang tidak simetris (seperti matahari asli)
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const len = Math.sqrt(x * x + y * y + z * z);
+      const nx = x / len, ny = y / len, nz = z / len;
+      
+      // Noise besar untuk bentuk tidak rata
+      const n1 = Math.sin(nx * 3 + ny * 2) * 0.15;
+      const n2 = Math.cos(ny * 4 + nz * 3) * 0.12;
+      const n3 = Math.sin(nz * 5 + nx * 4) * 0.1;
+      const noise = 1 + n1 + n2 + n3;
+      
+      pos.setXYZ(i, nx * layer.radius * noise, ny * layer.radius * noise, nz * layer.radius * noise);
+    }
+    geo.computeVertexNormals();
+    
+    const mat = new THREE.MeshBasicMaterial({
+      color: layer.color,
+      transparent: true,
+      opacity: layer.opacity,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    group.add(new THREE.Mesh(geo, mat));
+  });
+  
+  // ====== 5. SOLAR PROMINENCES - letupan api matahari ======
+  const prominenceCount = 6 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < prominenceCount; i++) {
+    // Posisi acak di permukaan matahari
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const surfacePos = new THREE.Vector3(
+      Math.sin(phi) * Math.cos(theta),
+      Math.sin(phi) * Math.sin(theta),
+      Math.cos(phi)
+    );
+    
+    // Bentuk prominence - lengkungan api
+    const height = 1.5 + Math.random() * 3;
+    const curve = new THREE.QuadraticBezierCurve3(
+      surfacePos.clone().multiplyScalar(3.2),
+      surfacePos.clone().multiplyScalar(3.2 + height).add(
+        new THREE.Vector3(
+          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 2
+        )
+      ),
+      surfacePos.clone().multiplyScalar(3.2).add(
+        new THREE.Vector3(
+          (Math.random() - 0.5) * 1.5,
+          (Math.random() - 0.5) * 1.5,
+          (Math.random() - 0.5) * 1.5
+        )
+      )
+    );
+    
+    const tubeGeo = new THREE.TubeGeometry(curve, 16, 0.15 + Math.random() * 0.2, 8, false);
+    const tubeMat = new THREE.MeshBasicMaterial({
+      color: 0xffaa44,
+      transparent: true,
+      opacity: 0.5 + Math.random() * 0.3,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const tube = new THREE.Mesh(tubeGeo, tubeMat);
+    group.add(tube);
+    
+    // Glow di ujung prominence
+    const tipGlowGeo = new THREE.SphereGeometry(0.4 + Math.random() * 0.3, 12, 12);
+    const tipGlowMat = new THREE.MeshBasicMaterial({
+      color: 0xffcc66,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const tipGlow = new THREE.Mesh(tipGlowGeo, tipGlowMat);
+    const endPoint = curve.getPoint(1);
+    tipGlow.position.copy(endPoint);
+    group.add(tipGlow);
+  }
+  
+  // ====== 6. SOLAR FLARE PARTICLES - partikel kecil yang meletup ======
+  const flareCount = 200;
+  const flarePositions = new Float32Array(flareCount * 3);
+  const flareColors = new Float32Array(flareCount * 3);
+  
+  for (let i = 0; i < flareCount; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 3.2 + Math.random() * 5;
+    
+    flarePositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    flarePositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    flarePositions[i * 3 + 2] = r * Math.cos(phi);
+    
+    // Warna dari putih (dekat) ke oranye (jauh)
+    const t = (r - 3.2) / 5;
+    flareColors[i * 3] = 1.0;
+    flareColors[i * 3 + 1] = 0.9 - t * 0.4;
+    flareColors[i * 3 + 2] = 0.7 - t * 0.6;
+  }
+  
+  const flareGeo = new THREE.BufferGeometry();
+  flareGeo.setAttribute('position', new THREE.BufferAttribute(flarePositions, 3));
+  flareGeo.setAttribute('color', new THREE.BufferAttribute(flareColors, 3));
+  
+  const flareMat = new THREE.PointsMaterial({
+    size: 0.3,
+    vertexColors: true,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.7,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    sizeAttenuation: true,
   });
-  const corona2 = new THREE.Mesh(corona2Geo, corona2Mat);
-  group.add(corona2);
+  group.add(new THREE.Points(flareGeo, flareMat));
   
-  // Corona outer - menyebar luas
-  const corona3Geo = new THREE.SphereGeometry(11, 48, 48);
-  const corona3Mat = new THREE.MeshBasicMaterial({
-    color: 0xff9922,
+  // ====== 7. LENS FLARE - efek optik kamera ======
+  // Sprite untuk lens flare horizontal
+  const flareSpriteMat = new THREE.SpriteMaterial({
+    color: 0xffeecc,
     transparent: true,
-    opacity: 0.18,
+    opacity: 0.4,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    depthTest: false,
   });
-  const corona3 = new THREE.Mesh(corona3Geo, corona3Mat);
-  group.add(corona3);
+  const flareSprite = new THREE.Sprite(flareSpriteMat);
+  flareSprite.scale.set(25, 25, 1);
+  group.add(flareSprite);
   
-  // Corona extreme - sangat luas dan samar
-  const corona4Geo = new THREE.SphereGeometry(16, 48, 48);
-  const corona4Mat = new THREE.MeshBasicMaterial({
-    color: 0xff6600,
+  // Vertical streak
+  const streakMat = new THREE.SpriteMaterial({
+    color: 0xffddaa,
     transparent: true,
-    opacity: 0.08,
+    opacity: 0.25,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    depthTest: false,
   });
-  const corona4 = new THREE.Mesh(corona4Geo, corona4Mat);
-  group.add(corona4);
+  const streak = new THREE.Sprite(streakMat);
+  streak.scale.set(8, 40, 1);
+  group.add(streak);
   
-  // Point light ULTRA TERANG untuk bloom effect
-  const sunLight = new THREE.PointLight(0xffeedd, 20, 250, 2);
+  // ====== 8. LIGHTS ======
+  // Main light - sangat terang
+  const sunLight = new THREE.PointLight(0xfff5dd, 25, 300, 1.8);
   group.add(sunLight);
   
-  // Secondary light untuk fill
-  const fillLight = new THREE.PointLight(0xffaa44, 8, 180, 2);
+  // Warm fill
+  const fillLight = new THREE.PointLight(0xffaa44, 10, 200, 2);
   group.add(fillLight);
+  
+  // Soft ambient dari matahari
+  const ambientSun = new THREE.PointLight(0xff8833, 5, 150, 2);
+  group.add(ambientSun);
   
   return group;
 }
@@ -1411,6 +1575,56 @@ export default function SpaceEnvironment() {
         sunLight.intensity = sunIntensityRef.current * 5;
       }
       mainLight.intensity = sunIntensityRef.current * 1.0;
+      
+      // ====== ANIMASI MATAHARI - rotasi dan pulsasi ======
+      // Rotasi perlahan
+      sun.rotation.y += delta * 0.05;
+      sun.rotation.x += delta * 0.02;
+      
+      // Pulsasi corona - skala berubah sedikit
+      const pulse = 1 + Math.sin(elapsed * 0.5) * 0.02;
+      sun.children.forEach((child, index) => {
+        if (child instanceof THREE.Mesh && index > 0 && index < 8) {
+          // Corona layers pulsasi dengan fase berbeda
+          const phase = index * 0.3;
+          const scale = 1 + Math.sin(elapsed * 0.3 + phase) * 0.015;
+          child.scale.set(scale, scale, scale);
+        }
+      });
+      
+      // Animasi solar flare particles - bergerak keluar
+      sun.children.forEach((child) => {
+        if (child instanceof THREE.Points) {
+          const positions = child.geometry.attributes.position;
+          for (let i = 0; i < positions.count; i++) {
+            const x = positions.getX(i);
+            const y = positions.getY(i);
+            const z = positions.getZ(i);
+            const dist = Math.sqrt(x * x + y * y + z * z);
+            
+            // Gerak keluar perlahan
+            if (dist > 3 && dist < 8) {
+              const speed = 0.02;
+              const nx = x / dist;
+              const ny = y / dist;
+              const nz = z / dist;
+              positions.setXYZ(i, x + nx * speed, y + ny * speed, z + nz * speed);
+            } else if (dist >= 8) {
+              // Reset ke permukaan
+              const theta = Math.random() * Math.PI * 2;
+              const phi = Math.acos(2 * Math.random() - 1);
+              const r = 3.2 + Math.random() * 0.5;
+              positions.setXYZ(
+                i,
+                r * Math.sin(phi) * Math.cos(theta),
+                r * Math.sin(phi) * Math.sin(theta),
+                r * Math.cos(phi)
+              );
+            }
+          }
+          positions.needsUpdate = true;
+        }
+      });
       
       // ====== COLLISION AVOIDANCE - JANGAN TABRAK MATAHARI ======
       const distToSun = camera.position.distanceTo(sun.position);
