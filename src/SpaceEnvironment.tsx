@@ -1026,10 +1026,10 @@ export default function SpaceEnvironment() {
 
     // ====== SCENE ======
     const scene = new THREE.Scene();
-    // Background GELAP - hampir hitam dengan sedikit warm tint
-    scene.background = new THREE.Color(0x050404);
-    // Fog GELAP dengan warm tint subtle
-    scene.fog = new THREE.FogExp2(0x0a0806, 0.024);
+    // Background GELAP - gray murni
+    scene.background = new THREE.Color(0x080808);
+    // Fog GELAP gray
+    scene.fog = new THREE.FogExp2(0x1a1a1a, 0.024);
 
     // ====== CAMERA ======
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 300);
@@ -1070,26 +1070,33 @@ export default function SpaceEnvironment() {
     const SUN_OFFSET = new THREE.Vector3(0, 8, -80); // matahari jauh di depan
     const SUN_SAFE_RADIUS = 18; // radius aman dari matahari
 
-    // ====== VOLUMETRIC FOG PARTICLES - kabut subtle ======
-    // Layer 1: Kabut dekat - partikel besar, opacity SANGAT RENDAH
+    // ====== VOLUMETRIC FOG PARTICLES - kabut gray di belakang matahari ======
+    // Matahari di (0, 8, -80), kabut di belakangnya (z = -90 sampai -150)
+    const FOG_CENTER_Z = -110; // tengah kabut di belakang matahari
+    const FOG_SPREAD_X = 60;   // penyebaran horizontal
+    const FOG_SPREAD_Y = 40;   // penyebaran vertikal
+    const FOG_SPREAD_Z = 40;   // penyebaran depth
+    
+    // Layer 1: Kabut dekat matahari - partikel besar
     const fogNearCount = 800;
     const fogNearPositions = new Float32Array(fogNearCount * 3);
     const fogNearColors = new Float32Array(fogNearCount * 3);
     
     for (let i = 0; i < fogNearCount; i++) {
-      const r = 15 + Math.random() * 40;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
+      // Posisi di belakang matahari
+      const x = (Math.random() - 0.5) * FOG_SPREAD_X;
+      const y = (Math.random() - 0.5) * FOG_SPREAD_Y + 8; // +8 untuk match matahari height
+      const z = FOG_CENTER_Z + (Math.random() - 0.5) * FOG_SPREAD_Z * 0.6;
       
-      fogNearPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      fogNearPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.6;
-      fogNearPositions[i * 3 + 2] = r * Math.cos(phi);
+      fogNearPositions[i * 3] = x;
+      fogNearPositions[i * 3 + 1] = y;
+      fogNearPositions[i * 3 + 2] = z;
       
-      // Warna warm golden SANGAT SAMAR
-      const brightness = 0.15 + Math.random() * 0.1;
-      fogNearColors[i * 3] = 0.6 * brightness;
-      fogNearColors[i * 3 + 1] = 0.45 * brightness;
-      fogNearColors[i * 3 + 2] = 0.25 * brightness;
+      // Warna GRAY
+      const brightness = 0.3 + Math.random() * 0.15;
+      fogNearColors[i * 3] = brightness;
+      fogNearColors[i * 3 + 1] = brightness;
+      fogNearColors[i * 3 + 2] = brightness;
     }
     
     const fogNearGeo = new THREE.BufferGeometry();
@@ -1115,18 +1122,20 @@ export default function SpaceEnvironment() {
     const fogMidColors = new Float32Array(fogMidCount * 3);
     
     for (let i = 0; i < fogMidCount; i++) {
-      const r = 30 + Math.random() * 60;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
+      // Posisi di belakang matahari, lebih jauh
+      const x = (Math.random() - 0.5) * FOG_SPREAD_X * 1.3;
+      const y = (Math.random() - 0.5) * FOG_SPREAD_Y * 1.2 + 8;
+      const z = FOG_CENTER_Z - 20 + (Math.random() - 0.5) * FOG_SPREAD_Z * 0.8;
       
-      fogMidPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      fogMidPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.7;
-      fogMidPositions[i * 3 + 2] = r * Math.cos(phi);
+      fogMidPositions[i * 3] = x;
+      fogMidPositions[i * 3 + 1] = y;
+      fogMidPositions[i * 3 + 2] = z;
       
-      const brightness = 0.12 + Math.random() * 0.08;
-      fogMidColors[i * 3] = 0.55 * brightness;
-      fogMidColors[i * 3 + 1] = 0.4 * brightness;
-      fogMidColors[i * 3 + 2] = 0.2 * brightness;
+      // Warna GRAY lebih gelap
+      const brightness = 0.25 + Math.random() * 0.12;
+      fogMidColors[i * 3] = brightness;
+      fogMidColors[i * 3 + 1] = brightness;
+      fogMidColors[i * 3 + 2] = brightness;
     }
     
     const fogMidGeo = new THREE.BufferGeometry();
@@ -1152,18 +1161,20 @@ export default function SpaceEnvironment() {
     const fogFarColors = new Float32Array(fogFarCount * 3);
     
     for (let i = 0; i < fogFarCount; i++) {
-      const r = 50 + Math.random() * 80;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
+      // Posisi paling jauh di belakang matahari
+      const x = (Math.random() - 0.5) * FOG_SPREAD_X * 1.6;
+      const y = (Math.random() - 0.5) * FOG_SPREAD_Y * 1.4 + 8;
+      const z = FOG_CENTER_Z - 40 + (Math.random() - 0.5) * FOG_SPREAD_Z;
       
-      fogFarPositions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      fogFarPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.8;
-      fogFarPositions[i * 3 + 2] = r * Math.cos(phi);
+      fogFarPositions[i * 3] = x;
+      fogFarPositions[i * 3 + 1] = y;
+      fogFarPositions[i * 3 + 2] = z;
       
-      const brightness = 0.1 + Math.random() * 0.06;
-      fogFarColors[i * 3] = 0.5 * brightness;
-      fogFarColors[i * 3 + 1] = 0.35 * brightness;
-      fogFarColors[i * 3 + 2] = 0.18 * brightness;
+      // Warna GRAY paling gelap
+      const brightness = 0.2 + Math.random() * 0.1;
+      fogFarColors[i * 3] = brightness;
+      fogFarColors[i * 3 + 1] = brightness;
+      fogFarColors[i * 3 + 2] = brightness;
     }
     
     const fogFarGeo = new THREE.BufferGeometry();
@@ -1281,19 +1292,13 @@ export default function SpaceEnvironment() {
       let spawnPos = new THREE.Vector3();
 
       for (let attempt = 0; attempt < 20; attempt++) {
-        // RANDOM 360 DERAJAT - spawn di semua arah
-        const yaw = Math.random() * Math.PI * 2;
-        const pitch = (Math.random() - 0.5) * Math.PI * 0.8; // -80° sampai +80°
-        const dist = MIN_SPAWN + Math.random() * (MAX_SPAWN - MIN_SPAWN);
+        // SPAWN DARI KABUT DI BELAKANG MATAHARI
+        // Kabut di sekitar z = -90 sampai -150, y = -12 sampai 28, x = -60 sampai 60
+        const spawnX = (Math.random() - 0.5) * 100; // -50 sampai 50
+        const spawnY = (Math.random() - 0.5) * 50 + 8; // -17 sampai 33 (center di y=8)
+        const spawnZ = -90 - Math.random() * 60; // -90 sampai -150
 
-        // Hitung posisi spawn dalam world space
-        const spawnDir = new THREE.Vector3(
-          Math.cos(pitch) * Math.sin(yaw),
-          Math.sin(pitch),
-          Math.cos(pitch) * Math.cos(yaw)
-        );
-
-        spawnPos = camera.position.clone().add(spawnDir.multiplyScalar(dist));
+        spawnPos = new THREE.Vector3(spawnX, spawnY, spawnZ);
 
         if (isPositionSafe(spawnPos, radius)) {
           placed = true;
@@ -1322,11 +1327,12 @@ export default function SpaceEnvironment() {
         (Math.random() - 0.5) * 0.01
       );
       
-      // Drift velocity - gerakan random natural
+      // Drift velocity - bergerak dari kabut menuju kamera
+      // Z positif = bergerak ke arah kamera (dari belakang ke depan)
       const driftVel = new THREE.Vector3(
-        (Math.random() - 0.5) * 0.8,
-        (Math.random() - 0.5) * 0.4,
-        (Math.random() - 0.5) * 0.8
+        (Math.random() - 0.5) * 0.6,  // sedikit ke samping
+        (Math.random() - 0.5) * 0.3,  // sedikit ke atas/bawah
+        1.2 + Math.random() * 0.8     // bergerak ke depan (ke arah kamera)
       );
 
       objects.push({ mesh, type, radius, rotSpeed, driftVel, age: 0, baseOpacity });
@@ -1413,10 +1419,7 @@ export default function SpaceEnvironment() {
         camera.position.add(cameraVelocity.clone().multiplyScalar(delta));
       }
 
-      // Update fog particles mengikuti kamera
-      fogNearParticles.position.copy(camera.position);
-      fogMidParticles.position.copy(camera.position);
-      fogFarParticles.position.copy(camera.position);
+      // Kabut tetap di posisi world space (di belakang matahari), tidak mengikuti kamera
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
       const sunWorldOffset = SUN_OFFSET.clone().applyQuaternion(camera.quaternion);
