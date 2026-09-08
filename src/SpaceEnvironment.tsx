@@ -1595,6 +1595,7 @@ export default function SpaceEnvironment() {
         );
       }
       fogNearPos.needsUpdate = true;
+      fogNearParticles.geometry.attributes.position.needsUpdate = true;
       
       // Update fog mid layer
       const fogMidPos = fogMidParticles.geometry.attributes.position;
@@ -1615,6 +1616,7 @@ export default function SpaceEnvironment() {
         );
       }
       fogMidPos.needsUpdate = true;
+      fogMidParticles.geometry.attributes.position.needsUpdate = true;
       
       // Update fog far layer
       const fogFarPos = fogFarParticles.geometry.attributes.position;
@@ -1635,17 +1637,27 @@ export default function SpaceEnvironment() {
         );
       }
       fogFarPos.needsUpdate = true;
+      fogFarParticles.geometry.attributes.position.needsUpdate = true;
       
       // PENTING: Reset material properties SETELAH update posisi partikel
       // Menggunakan ShaderMaterial yang TIDAK BISA DIUBAH oleh three.js
       fogNearMat.uniforms.opacity.value = 0.35;
       fogNearMat.uniforms.size.value = 60.0;
+      fogNearMat.uniformsNeedUpdate = true;
+      fogNearMat.needsUpdate = true;
+      fogNearParticles.visible = true;
       
       fogMidMat.uniforms.opacity.value = 0.25;
       fogMidMat.uniforms.size.value = 45.0;
+      fogMidMat.uniformsNeedUpdate = true;
+      fogMidMat.needsUpdate = true;
+      fogMidParticles.visible = true;
       
       fogFarMat.uniforms.opacity.value = 0.18;
       fogFarMat.uniforms.size.value = 30.0;
+      fogFarMat.uniformsNeedUpdate = true;
+      fogFarMat.needsUpdate = true;
+      fogFarParticles.visible = true;
 
       // ====== UPDATE MATAHARI - tetap di depan kamera ======
       const sunWorldOffset = SUN_OFFSET.clone().applyQuaternion(camera.quaternion);
@@ -1795,13 +1807,13 @@ export default function SpaceEnvironment() {
       }
       
       // PENTING: Pastikan SELALU ada object di depan kamera
-      // Jika tidak ada object dalam jarak 50 unit, spawn segera
+      // Jika tidak ada object dalam jarak 10-50 unit, spawn segera (tapi tetap satu per satu)
       const hasObjectNearby = objects.some(obj => {
         const dist = camera.position.distanceTo(obj.mesh.position);
         return dist < 50 && dist > 10; // antara 10-50 unit dari kamera
       });
       
-      if (!hasObjectNearby && objects.length < MAX_OBJECTS) {
+      if (!hasObjectNearby && objects.length < MAX_OBJECTS && spawnTimer > 0.5) {
         spawnObject();
         spawnTimer = 0;
         nextSpawnDelay = 1.0 + Math.random() * 2.0;
